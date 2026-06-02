@@ -1,0 +1,150 @@
+name: Playwright Java Automation CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ─── Checkout ───────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ─── Java Setup ─────────────────────────────────────────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # ─── System Dependencies ─────────────────────────────────────────────────
+      - name: Install Tesseract OCR
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tesseract-ocr
+
+      # ─── Playwright Browsers ─────────────────────────────────────────────────
+      - name: Install Playwright Browsers
+        run: |
+          mvn exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI \
+            -Dexec.args="install --with-deps" \
+            -Dexec.classpathScope=compile \
+            --no-transfer-progress
+
+      # ─── Run Tests ───────────────────────────────────────────────────────────
+      - name: Run TestNG Parallel Tests
+        run: mvn clean test --no-transfer-progress
+        env:
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "true"
+
+      # ─── Upload Report Artifact ───────────────────────────────────────────────
+      - name: Upload HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: automation-report
+          path: reports/
+          retention-days: 30
+
+      # ─── Upload Screenshots Artifact ──────────────────────────────────────────
+      - name: Upload Failure Screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: failure-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # ─── Collect Test Summary ────────────────────────────────────────────────
+      - name: Collect Test Summary
+        if: always()
+        id: test_summary
+        run: |
+          TOTAL=$(grep -oP 'Tests run: \K[0-9]+' target/surefire-reports/*.txt 2>/dev/null | paste -sd+ | bc || echo "0")
+          FAILURES=$(grep -oP 'Failures: \K[0-9]+' target/surefire-reports/*.txt 2>/dev/null | paste -sd+ | bc || echo "0")
+          ERRORS=$(grep -oP 'Errors: \K[0-9]+' target/surefire-reports/*.txt 2>/dev/null | paste -sd+ | bc || echo "0")
+          SKIPPED=$(grep -oP 'Skipped: \K[0-9]+' target/surefire-reports/*.txt 2>/dev/null | paste -sd+ | bc || echo "0")
+          PASSED=$((TOTAL - FAILURES - ERRORS - SKIPPED))
+          STATUS="✅ PASSED"
+          if [ "$FAILURES" -gt "0" ] || [ "$ERRORS" -gt "0" ]; then STATUS="❌ FAILED"; fi
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$((FAILURES + ERRORS))" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      # ─── Send Email Report ───────────────────────────────────────────────────
+      - name: Send Email Report
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Automation Execution Report — ${{ steps.test_summary.outputs.status }}"
+          to: ${{ secrets.RECEIVER_EMAIL }}
+          from: "Automation CI <${{ secrets.EMAIL_USERNAME }}>"
+          html_body: |
+            <html>
+            <body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px;">
+              <div style="max-width:600px; margin:auto; background:#fff; border-radius:8px; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                <h2 style="color:#333; border-bottom:2px solid #007bff; padding-bottom:10px;">
+                  🤖 Automation Execution Report
+                </h2>
+                <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+                  <tr style="background:#f8f9fa;">
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd;">Status</td>
+                    <td style="padding:10px; border:1px solid #ddd; font-size:18px;">${{ steps.test_summary.outputs.status }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd;">Total Tests</td>
+                    <td style="padding:10px; border:1px solid #ddd;">${{ steps.test_summary.outputs.total }}</td>
+                  </tr>
+                  <tr style="background:#f8f9fa;">
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd; color:green;">✅ Passed</td>
+                    <td style="padding:10px; border:1px solid #ddd; color:green; font-weight:bold;">${{ steps.test_summary.outputs.passed }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd; color:red;">❌ Failed</td>
+                    <td style="padding:10px; border:1px solid #ddd; color:red; font-weight:bold;">${{ steps.test_summary.outputs.failed }}</td>
+                  </tr>
+                  <tr style="background:#f8f9fa;">
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd; color:orange;">⏭ Skipped</td>
+                    <td style="padding:10px; border:1px solid #ddd;">${{ steps.test_summary.outputs.skipped }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd;">Triggered By</td>
+                    <td style="padding:10px; border:1px solid #ddd;">${{ github.actor }}</td>
+                  </tr>
+                  <tr style="background:#f8f9fa;">
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd;">Branch</td>
+                    <td style="padding:10px; border:1px solid #ddd;">${{ github.ref_name }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px; font-weight:bold; border:1px solid #ddd;">Run URL</td>
+                    <td style="padding:10px; border:1px solid #ddd;">
+                      <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" style="color:#007bff;">
+                        View Workflow Run
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin-top:20px; font-size:12px; color:#888;">
+                  This is an automated report from GitHub Actions. Download full artifacts (HTML report + screenshots) from the workflow run link above.
+                </p>
+              </div>
+            </body>
+            </html>
+          attachments: reports/AutomationReport.html
+          ignore_cert: false

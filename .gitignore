@@ -1,0 +1,40 @@
+# ─── Maven Build Output ───────────────────────────────────
+target/
+
+# ─── Screenshots (can be large, generated at runtime) ─────
+screenshots/
+
+# ─── Extent Reports (generated at runtime) ────────────────
+reports/
+
+# ─── IDE Files ────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# ─── OS Junk ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Compiled Binaries ────────────────────────────────────
+*.class
+*.jar
+*.war
+*.ear
+
+# ─── Tesseract Data (can be re-downloaded) ────────────────
+# tessdata/   <-- Keep tessdata committed so CI has it
+
+# ─── Temp/Scratch ─────────────────────────────────────────
+scratch/
+*.tmp
+*.log
+
+# ─── Playwright Local Browsers ────────────────────────────
+# Playwright downloads browsers to ~/.cache/ms-playwright, not project dir
