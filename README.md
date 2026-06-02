@@ -1,186 +1,106 @@
 # 🤖 Automation Reporting
 
-> Enterprise-grade Playwright Java + TestNG automation framework with parallel cross-browser execution, Tesseract OCR captcha handling, Extent HTML reporting, GitHub Actions CI/CD, and automated email notifications.
+A high-performance Playwright Java + TestNG automation framework featuring parallel cross-browser execution, Tesseract OCR captcha handling, Extent HTML reporting, and GitHub Actions CI/CD with automatic email reports.
 
 ---
 
 ## 📋 Table of Contents
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Local Execution](#local-execution)
-- [TestNG Parallel Execution](#testng-parallel-execution)
-- [GitHub Actions CI/CD](#github-actions-cicd)
-- [Reports](#reports)
-- [GitHub Secrets Setup](#github-secrets-setup)
-- [Adding New Modules](#adding-new-modules)
+- [Project Structure](#-project-structure)
+- [Tech Stack](#-tech-stack)
+- [Execution Modes](#-execution-modes)
+- [Reports & Failure Screenshots](#-reports--failure-screenshots)
+- [GitHub Actions & Email Reporting](#-github-actions--email-reporting)
+- [Housekeeping & Clean-up](#-housekeeping--clean-up)
 
 ---
 
 ## 📁 Project Structure
 
-```
-Automation Reporting/
-├── .github/
-│   └── workflows/
-│       └── automation.yml          # GitHub Actions CI pipeline
-├── src/
-│   ├── main/java/com/rlogical/automation/
-│   │   ├── App.java                # Entry point for exec:java mode
-│   │   ├── modules/
-│   │   │   └── Module1_FormFlow.java  # Module 1: URL → Fill Form → Submit
-│   │   └── utils/
-│   │       ├── AutomationHelper.java  # Captcha OCR, screenshot, element helpers
-│   │       └── BrowserLauncher.java   # Browser factory (chromium/firefox/webkit)
-│   └── test/java/com/rlogical/automation/
-│       ├── BrowserTest.java            # TestNG parallel test entry
-│       └── reporting/
-│           └── ExtentReportListener.java  # Extent HTML report generator
-├── tessdata/                       # Tesseract OCR training data
-├── screenshots/                    # Auto-captured failure screenshots
-│   └── {Module}/{Browser}/{timestamp}.png
-├── reports/
-│   └── AutomationReport.html       # Generated Extent HTML report
-├── testng.xml                      # TestNG suite configuration
-├── pom.xml                         # Maven build + dependencies
-└── README.md
+```text
+Automation-Reporting/
+├── .github/workflows/
+│   └── automation.yml          # CI/CD pipeline configuration
+├── src/main/java/com/rlogical/automation/
+│   ├── App.java                # Single-browser visible entry point (dev)
+│   ├── modules/
+│   │   └── Module1_FormFlow.java  # Flow: URL → Fill Form → Submit
+│   └── utils/
+│       ├── AutomationHelper.java  # OCR, forms, popups, and random generators
+│       ├── BrowserLauncher.java   # Thread-safe Playwright browser manager
+│       └── FailureHandler.java    # Automatic failure screenshot taker
+├── src/test/java/com/rlogical/automation/
+│   ├── BrowserTest.java        # Parallel browser execution test class
+│   └── reporting/
+│       └── ExtentReportListener.java # Extent HTML report suite listener
+├── tessdata/                   # Required Tesseract OCR training data
+├── testng.xml                  # TestNG suite configurations
+└── pom.xml                     # Maven dependencies & build setup
 ```
 
 ---
 
 ## 🛠 Tech Stack
 
-| Technology | Version | Purpose |
-|---|---|---|
-| Java | 17 | Core language |
-| Playwright Java | 1.49.0 | Browser automation |
-| TestNG | 7.10.2 | Test framework + parallel execution |
-| Tess4J | 5.18.0 | Tesseract OCR — captcha reading |
-| ExtentReports | 5.1.1 | HTML execution reports |
-| Maven | 3.9+ | Build + dependency management |
+* **Java 17**: Core programming language.
+* **Playwright Java (1.49.0)**: Modern browser automation.
+* **TestNG (7.10.2)**: Thread-safe parallel test runner.
+* **Tess4J (5.18.0) / Tesseract OCR**: Captcha text recognition.
+* **ExtentReports (5.1.1)**: Dark-theme test execution reports.
 
 ---
 
-## ⚡ Local Execution
+## ⚡ Execution Modes
 
-### Single Browser (Development / Debug Mode)
+### 1. Local Development (Single Browser, Visible)
+Useful for local debugging and script creation. Runs Chrome only.
 ```bash
 mvn compile exec:java
 ```
-- Runs in **Chromium** (visible browser window)
-- Executes current module flow: **URL → Fill Form → Submit**
-- Browser closes automatically after execution
 
-### Parallel Cross-Browser Execution
+### 2. Full Parallel Test Suite (Multi-Browser, Headless/Visible)
+Runs tests in Chromium, Firefox, and WebKit simultaneously.
 ```bash
 mvn clean test
 ```
-- Runs all 3 browsers **simultaneously**: Chromium + Firefox + WebKit
-- Uses TestNG parallel configuration from `testng.xml`
-- One browser failure does **not** stop others
-- Generates `reports/AutomationReport.html` after execution
 
 ---
 
-## 🌐 TestNG Parallel Execution
+## 📊 Reports & Failure Screenshots
 
-The `testng.xml` configures true parallel browser execution:
-
-```xml
-<suite name="AutomationSuite" parallel="tests" thread-count="3" verbose="0">
-  <test name="Chrome">  → Chromium
-  <test name="Firefox"> → Firefox
-  <test name="WebKit">  → WebKit (Safari engine)
-</suite>
-```
-
-Each browser runs in its own thread with isolated Playwright instances (thread-safe).
+* **Extent HTML Report**: Generated automatically after every run at `reports/AutomationReport.html`. Displays logs categorized by browser.
+* **Failure Screenshots**: Captured automatically on any test failure. Screenshots are:
+  * Embedded directly into the HTML report.
+  * Saved under `screenshots/{ModuleName}/{BrowserName}/{Filename}.png`.
 
 ---
 
-## 🚀 GitHub Actions CI/CD
+## 🚀 GitHub Actions & Email Reporting
 
-The pipeline (`.github/workflows/automation.yml`) automatically triggers on:
-- Every **push** to `main` or `master`
-- Manual trigger via **GitHub → Actions → Run workflow**
+Every push to `master` (or manual run from the GitHub Actions tab) triggers the CI/CD pipeline:
+1. Installs Java 17, Tesseract OCR, and Playwright browsers on the virtual runner.
+2. Runs the parallel test suite (`mvn clean test`).
+3. Uploads the HTML report and screenshots as run artifacts.
+4. Sends a styled email execution report to the configured receiver.
 
-### Pipeline Steps
-1. ✅ Checkout code
-2. ✅ Set up Java 17 (Temurin)
-3. ✅ Install Tesseract OCR
-4. ✅ Install Playwright browsers (with system deps)
-5. ✅ Run `mvn clean test` (all 3 browsers in parallel)
-6. ✅ Upload **HTML report** as GitHub artifact (retained 30 days)
-7. ✅ Upload **failure screenshots** as GitHub artifact
-8. ✅ Send **email report** with pass/fail summary + attached HTML report
+### GitHub Secrets Setup (Required for Email Reports)
+Add these secrets in `GitHub Repository -> Settings -> Secrets and variables -> Actions`:
 
----
-
-## 📊 Reports
-
-### Extent HTML Report
-After running `mvn clean test`, open the report in your browser:
-```
-reports/AutomationReport.html
-```
-
-**Report Features:**
-- 🌑 Dark theme
-- Browser-wise test categorization (Chrome / Firefox / WebKit)
-- Pass ✅ / Fail ❌ / Skip ⏭ status per test
-- Auto-embedded failure screenshots
-- Execution timestamp and system info
-
----
-
-## 🔐 GitHub Secrets Setup
-
-To enable automated email reports, configure these **3 secrets** in your GitHub repository:
-
-**Go to:** `GitHub Repository → Settings → Secrets and variables → Actions → New repository secret`
-
-| Secret Name | Description | Example |
+| Secret Name | Purpose | Example / How-to |
 |---|---|---|
-| `EMAIL_USERNAME` | Gmail address used to send reports | `yourname@gmail.com` |
-| `EMAIL_PASSWORD` | Gmail **App Password** (not your regular password) | `abcd efgh ijkl mnop` |
-| `RECEIVER_EMAIL` | Email address to receive the report | `team@company.com` |
-
-### How to Generate a Gmail App Password
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Enable **2-Step Verification** (required)
-3. Go to **App passwords**
-4. Select app: **Mail**, device: **Other (custom name)** → type "Automation CI"
-5. Copy the 16-character app password → use as `EMAIL_PASSWORD` secret
-
-> [!IMPORTANT]
-> Never commit credentials directly in code or workflow files. Always use GitHub Secrets.
+| `EMAIL_USERNAME` | Sender email address | `sender@gmail.com` |
+| `EMAIL_PASSWORD` | Gmail App Password | 16-character code from Google Security settings |
+| `RECEIVER_EMAIL` | Email address to receive the report | `recipient@gmail.com` |
 
 ---
 
-## 🧩 Adding New Modules
+## 🧹 Housekeeping & Clean-up
 
-To add a new automation module:
+To keep the repository light and clean, manage your files as follows:
 
-1. Create `src/main/java/com/rlogical/automation/modules/Module2_XYZ.java`
-2. Implement your flow using `AutomationHelper` utilities
-3. Call it from `BrowserTest.java` inside the `runTest()` method
-4. For local dev mode, call it from `App.java`
-
----
-
-## 📸 Failure Screenshots
-
-Screenshots are automatically captured on any failure and saved to:
-```
-screenshots/
-└── {ModuleName}/
-    └── {BrowserName}/
-        └── {ModuleName}_{Browser}_{timestamp}.png
-```
-
-Screenshots are also:
-- 📎 Embedded in the Extent HTML report
-- 📤 Uploaded as GitHub Actions artifacts
-
----
-
-*Generated and maintained by the Antigravity automation framework.*
+| Directory / File | Description | Action / Recommendation |
+|---|---|---|
+| **`tessdata/`** | Contains Tesseract language files. | **DO NOT REMOVE** (Required for captcha solver). |
+| **`scratch/`** | Temporary OCR screenshot folder. | **DO NOT REMOVE** (The code automatically creates and cleans up temporary files after every run). |
+| **`screenshots/`** | Failure screenshots folder. | **SAFE TO DELETE** (Can be cleared manually anytime). |
+| **`reports/`** | Test execution reports. | **SAFE TO DELETE** (Regenerated automatically on the next run). |
+| **`target/`** | Compiled class files and Maven build output. | **SAFE TO DELETE** (Run `mvn clean` to delete it). |
