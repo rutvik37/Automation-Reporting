@@ -20,6 +20,7 @@ public class FailureHandler {
             }
             return success;
         } catch (Exception e) {
+            e.printStackTrace(); // Print stack trace to debug failures
             handleFailure(page, moduleName, browserName, "Exception_" + e.getClass().getSimpleName());
             return false;
         }

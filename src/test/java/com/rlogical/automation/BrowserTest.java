@@ -12,11 +12,12 @@ public class BrowserTest {
     public void runBrowserTest(String browserName) {
         boolean success = false;
 
-        // Run full parallel execution (headless=false / visible, as per existing config)
+        // Run full parallel execution (headless=false / visible, as per request)
         try (BrowserLauncher launcher = new BrowserLauncher(browserName, false)) {
             // Execute Module 1. Future modules can be appended here.
             success = Module1_FormFlow.execute(launcher.page, browserName);
         } catch (Exception e) {
+            e.printStackTrace(); // Print launch exceptions to console for visibility
             success = false;
         }
 
@@ -30,5 +31,7 @@ public class BrowserTest {
         } else {
             System.out.println("form submission failed in " + friendlyName.toLowerCase());
         }
+
+        org.testng.Assert.assertTrue(success, "Form submission failed in " + friendlyName.toLowerCase());
     }
 }

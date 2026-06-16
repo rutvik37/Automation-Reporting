@@ -62,9 +62,12 @@ public class ExtentReportListener implements ITestListener {
         Object[] params = result.getParameters();
         if (params != null && params.length > 0) {
             browser = params[0].toString();
-            if ("chromium".equalsIgnoreCase(browser)) browser = "Chrome";
-            else if ("firefox".equalsIgnoreCase(browser)) browser = "Firefox";
-            else if ("webkit".equalsIgnoreCase(browser)) browser = "WebKit";
+            if ("chromium".equalsIgnoreCase(browser))
+                browser = "Chrome";
+            else if ("firefox".equalsIgnoreCase(browser))
+                browser = "Firefox";
+            else if ("webkit".equalsIgnoreCase(browser))
+                browser = "WebKit";
         }
 
         ExtentTest test = createExtentInstance()
@@ -111,13 +114,15 @@ public class ExtentReportListener implements ITestListener {
         try {
             // Look in screenshots/<module>/<browser>/ for the most recent screenshot
             File screenshotsRoot = new File("screenshots");
-            if (!screenshotsRoot.exists()) return;
+            if (!screenshotsRoot.exists())
+                return;
 
             File latestFile = null;
             for (File moduleDir : screenshotsRoot.listFiles(File::isDirectory)) {
                 for (File browserDir : moduleDir.listFiles(File::isDirectory)) {
                     File[] pngs = browserDir.listFiles(f -> f.getName().endsWith(".png"));
-                    if (pngs == null) continue;
+                    if (pngs == null)
+                        continue;
                     for (File png : pngs) {
                         if (latestFile == null || png.lastModified() > latestFile.lastModified()) {
                             latestFile = png;

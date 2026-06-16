@@ -17,6 +17,13 @@ import java.nio.file.Paths;
 public class AutomationHelper {
     private static final String TESSDATA_PATH = "tessdata";
 
+    // Static form data values
+    private static final String STATIC_NAME = "Tester Testing";
+    private static final String STATIC_EMAIL = "testing5555@gmail.com";
+    private static final String STATIC_MOBILE = "+91 1234567890";
+    private static final String STATIC_COMPANY = "Testing company";
+    private static final String STATIC_DESCRIPTION = "Testing Decription for verify these functionality";
+
     public static boolean fillAndSubmitForm(Page page, String containerSelector, String browserType) {
         Locator container = page.locator(containerSelector);
 
@@ -44,7 +51,7 @@ public class AutomationHelper {
         try {
             for (int submitAttempt = 1; submitAttempt <= maxSubmitAttempts; submitAttempt++) {
                 if (submitAttempt == 1) {
-                    fillDummyDataForForm(container);
+                    fillDummyDataForForm(page, container);
                 } else {
                     // Wait for the captcha image src or challenge ID to change from lastImgSrc / lastChallengeId
                     long refreshStart = System.currentTimeMillis();
@@ -96,6 +103,7 @@ public class AutomationHelper {
                     // Ignore
                 }
 
+                page.waitForTimeout(2000); // Wait 2 seconds before submitting form
                 submitBtn.click();
 
                 // Quick, responsive poll for success or validation error
@@ -108,7 +116,19 @@ public class AutomationHelper {
                     // 1. Check URL for success redirection
                     String currentUrl = page.url();
                     if (currentUrl.contains("/thank-you/") || currentUrl.contains("thank")) {
-                        isSuccess = true;
+                        // Wait for the text to appear on the page to ensure successful redirection and display
+                        try {
+                            page.locator("text=Thank You for Contacting Us").waitFor(new Locator.WaitForOptions().setTimeout(5000));
+                            isSuccess = true;
+                        } catch (Exception e) {
+                            // Fallback: check if the page body text contains it
+                            String bodyText = page.locator("body").innerText();
+                            if (bodyText.contains("Thank You for Contacting Us") || bodyText.toLowerCase().contains("thank you")) {
+                                isSuccess = true;
+                            } else {
+                                isSuccess = false;
+                            }
+                        }
                         isComplete = true;
                         break;
                     }
@@ -120,7 +140,8 @@ public class AutomationHelper {
                         if (!responseText.isEmpty()) {
                             if (responseText.toLowerCase().contains("thank you")
                                     || responseText.toLowerCase().contains("sent")
-                                    || responseText.toLowerCase().contains("success")) {
+                                    || responseText.toLowerCase().contains("success")
+                                    || responseText.contains("Thank You for Contacting Us")) {
                                 isSuccess = true;
                             }
                             isComplete = true;
@@ -226,6 +247,7 @@ public class AutomationHelper {
             }
 
             captchaInput.fill(extractedCode);
+            page.waitForTimeout(1500); // Wait 1.5 seconds after filling captcha
 
             String enteredVal = captchaInput.inputValue();
             String finalChallenge = getCaptchaChallengeId(container);
@@ -246,33 +268,35 @@ public class AutomationHelper {
         return false;
     }
 
-    public static void fillDummyDataForForm(Locator container) {
-        String randomString = generateRandomString(12);
-        String randomName = randomString;
-        String randomEmail = randomString + "@testmail.com";
-        String randomMobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
-        String randomCompany = "xyzabccompany";
-        String randomDescribe = "generic placeholder description message details";
-
+    public static void fillDummyDataForForm(Page page, Locator container) {
         Locator fnameField = container.locator("input[name='fname']").first();
         fnameField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        fnameField.fill(randomName);
+        fnameField.fill(STATIC_NAME);
+        page.waitForTimeout(1500); // Wait 1.5 seconds after filling name
 
         Locator emailField = container.locator("input[name='email']").first();
         emailField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        emailField.fill(randomEmail);
+        emailField.fill(STATIC_EMAIL);
+        page.waitForTimeout(1500); // Wait 1.5 seconds after filling email
 
         Locator mobileField = container.locator("input[name='mobile']").first();
         mobileField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        mobileField.fill(randomMobile);
+        String cleanedMobile = STATIC_MOBILE.replaceAll("[^0-9]", "");
+        if (cleanedMobile.length() > 10) {
+            cleanedMobile = cleanedMobile.substring(cleanedMobile.length() - 10);
+        }
+        mobileField.fill(cleanedMobile);
+        page.waitForTimeout(1500); // Wait 1.5 seconds after filling mobile
 
         Locator companyField = container.locator("input[name='company']").first();
         companyField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        companyField.fill(randomCompany);
+        companyField.fill(STATIC_COMPANY);
+        page.waitForTimeout(1500); // Wait 1.5 seconds after filling company
 
         Locator describeField = container.locator("textarea[name='describe']").first();
         describeField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        describeField.fill(randomDescribe);
+        describeField.fill(STATIC_DESCRIPTION);
+        page.waitForTimeout(1500); // Wait 1.5 seconds after filling description
     }
 
     public static void handlePopupsIfPresent(Page page) {
