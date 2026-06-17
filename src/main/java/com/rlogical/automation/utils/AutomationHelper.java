@@ -16,8 +16,13 @@ import java.nio.file.Paths;
 
 public class AutomationHelper {
     static {
-        // Set native library path for JNA to find Homebrew's libtesseract on macOS
-        System.setProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib");
+        // Set native library path for JNA depending on the operating system
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("mac")) {
+            System.setProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib");
+        } else if (!os.contains("win")) {
+            System.setProperty("jna.library.path", "/usr/lib/x86_64-linux-gnu:/usr/lib");
+        }
     }
     private static final String TESSDATA_PATH = "tessdata";
 
