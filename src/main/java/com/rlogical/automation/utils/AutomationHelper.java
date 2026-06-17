@@ -15,6 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class AutomationHelper {
+    static {
+        // Set native library path for JNA to find Homebrew's libtesseract on macOS
+        System.setProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib");
+    }
     private static final String TESSDATA_PATH = "tessdata";
 
     // Static form data values
@@ -25,11 +29,12 @@ public class AutomationHelper {
     private static final String STATIC_DESCRIPTION = "Testing Decription for verify these functionality";
 
     public static boolean fillAndSubmitForm(Page page, String containerSelector, String browserType) {
-        Locator container = page.locator(containerSelector);
+        Locator container = page.locator(containerSelector).first();
 
         try {
             container.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
         } catch (Exception e) {
+            System.err.println("[" + browserType + "] Error: Form container " + containerSelector + " not visible.");
             return false;
         }
 
@@ -41,6 +46,7 @@ public class AutomationHelper {
             captchaImg.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
             captchaInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
         } catch (Exception e) {
+            System.err.println("[" + browserType + "] Error: Captcha image or input element not found in form.");
             return false;
         }
 
@@ -71,17 +77,22 @@ public class AutomationHelper {
                     }
                     // Give a tiny buffer for image to load/render
                     page.waitForTimeout(200);
+
+                    // Refill all fields (name, email, number, company, description) on retry
+                    fillDummyDataForForm(page, container);
                 }
 
                 Locator submitBtn = container.locator("input[type='submit']").first();
                 try {
                     submitBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
                 } catch (Exception e) {
+                    System.err.println("[" + browserType + "] Error: Submit button not visible.");
                     return false;
                 }
 
                 boolean captchaSolved = solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
                 if (!captchaSolved) {
+                    System.err.println("[" + browserType + "] Error: Captcha solving failed.");
                     return false;
                 }
 
@@ -113,40 +124,44 @@ public class AutomationHelper {
                 long maxWaitMs = 15000; // max 15 seconds wait for AJAX response
 
                 while (System.currentTimeMillis() - startTime < maxWaitMs) {
-                    // 1. Check URL for success redirection
-                    String currentUrl = page.url();
-                    if (currentUrl.contains("/thank-you/") || currentUrl.contains("thank")) {
-                        // Wait for the text to appear on the page to ensure successful redirection and display
-                        try {
-                            page.locator("text=Thank You for Contacting Us").waitFor(new Locator.WaitForOptions().setTimeout(5000));
-                            isSuccess = true;
-                        } catch (Exception e) {
-                            // Fallback: check if the page body text contains it
-                            String bodyText = page.locator("body").innerText();
-                            if (bodyText.contains("Thank You for Contacting Us") || bodyText.toLowerCase().contains("thank you")) {
+                    try {
+                        // 1. Check URL for success redirection
+                        String currentUrl = page.url();
+                        if (currentUrl.contains("/thank-you/") || currentUrl.contains("thank")) {
+                            // Wait for the text to appear on the page to ensure successful redirection and display
+                            try {
+                                page.locator("text=Thank You for Contacting Us").waitFor(new Locator.WaitForOptions().setTimeout(5000));
                                 isSuccess = true;
-                            } else {
-                                isSuccess = false;
-                            }
-                        }
-                        isComplete = true;
-                        break;
-                    }
-
-                    // 2. Check response output element for validation message
-                    Locator responseOutput = container.locator("div.wpcf7-response-output").first();
-                    if (responseOutput.count() > 0 && responseOutput.isVisible()) {
-                        String responseText = responseOutput.innerText().trim();
-                        if (!responseText.isEmpty()) {
-                            if (responseText.toLowerCase().contains("thank you")
-                                    || responseText.toLowerCase().contains("sent")
-                                    || responseText.toLowerCase().contains("success")
-                                    || responseText.contains("Thank You for Contacting Us")) {
-                                isSuccess = true;
+                            } catch (Exception e) {
+                                // Fallback: check if the page body text contains it
+                                String bodyText = page.locator("body").innerText();
+                                if (bodyText.contains("Thank You for Contacting Us") || bodyText.toLowerCase().contains("thank you")) {
+                                    isSuccess = true;
+                                } else {
+                                    isSuccess = false;
+                                }
                             }
                             isComplete = true;
                             break;
                         }
+
+                        // 2. Check response output element for validation message
+                        Locator responseOutput = container.locator("div.wpcf7-response-output").first();
+                        if (responseOutput.count() > 0 && responseOutput.isVisible()) {
+                            String responseText = responseOutput.innerText().trim();
+                            if (!responseText.isEmpty()) {
+                                if (responseText.toLowerCase().contains("thank you")
+                                        || responseText.toLowerCase().contains("sent")
+                                        || responseText.toLowerCase().contains("success")
+                                        || responseText.contains("Thank You for Contacting Us")) {
+                                    isSuccess = true;
+                                }
+                                isComplete = true;
+                                break;
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Ignore exceptions caused by page unloading/navigating during submit
                     }
 
                     page.waitForTimeout(200);
@@ -157,9 +172,11 @@ public class AutomationHelper {
                 }
 
                 if (!isComplete) {
-                    // If it timed out, assume failure for this attempt
-                    continue;
+                    System.err.println("[" + browserType + "] Attempt " + submitAttempt + " timed out waiting for redirection.");
+                } else {
+                    System.err.println("[" + browserType + "] Attempt " + submitAttempt + " failed to redirect/show success message.");
                 }
+                continue;
             }
         } finally {
             cleanUpTempFiles(browserType);
@@ -236,7 +253,8 @@ public class AutomationHelper {
                         extractedCode = "1234";
                     }
                 } catch (Exception e) {
-                    // Ignore
+                    System.err.println("[" + browserType + "] OCR attempt failed: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
 
@@ -269,15 +287,17 @@ public class AutomationHelper {
     }
 
     public static void fillDummyDataForForm(Page page, Locator container) {
+        Locator companyField = container.locator("input[name='company']").first();
+        companyField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        companyField.fill(STATIC_COMPANY);
+
         Locator fnameField = container.locator("input[name='fname']").first();
         fnameField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         fnameField.fill(STATIC_NAME);
-        page.waitForTimeout(1500); // Wait 1.5 seconds after filling name
 
         Locator emailField = container.locator("input[name='email']").first();
         emailField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         emailField.fill(STATIC_EMAIL);
-        page.waitForTimeout(1500); // Wait 1.5 seconds after filling email
 
         Locator mobileField = container.locator("input[name='mobile']").first();
         mobileField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
@@ -286,17 +306,20 @@ public class AutomationHelper {
             cleanedMobile = cleanedMobile.substring(cleanedMobile.length() - 10);
         }
         mobileField.fill(cleanedMobile);
-        page.waitForTimeout(1500); // Wait 1.5 seconds after filling mobile
 
-        Locator companyField = container.locator("input[name='company']").first();
-        companyField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        companyField.fill(STATIC_COMPANY);
-        page.waitForTimeout(1500); // Wait 1.5 seconds after filling company
+        Locator categoryField = container.locator("select[name='category']").first();
+        if (categoryField.count() > 0 && categoryField.isVisible()) {
+            categoryField.selectOption("Hire Developers");
+            try {
+                categoryField.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))");
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
 
         Locator describeField = container.locator("textarea[name='describe']").first();
         describeField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
         describeField.fill(STATIC_DESCRIPTION);
-        page.waitForTimeout(1500); // Wait 1.5 seconds after filling description
     }
 
     public static void handlePopupsIfPresent(Page page) {

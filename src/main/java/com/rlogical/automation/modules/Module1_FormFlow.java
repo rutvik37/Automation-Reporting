@@ -13,32 +13,25 @@ public class Module1_FormFlow {
     public static boolean execute(Page page, String browserType) {
         return com.rlogical.automation.utils.FailureHandler.runWithFailureHandling(page, "Module1", browserType,
                 (p) -> {
-                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
-                    p.waitForLoadState(LoadState.DOMCONTENTLOADED);
-                    p.locator("body").waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-
-                    // Wait up to 8 seconds for the OneSignal popup
-                    Locator onesignalAllow = p.locator("#onesignal-slidedown-allow-button");
-                    try {
-                        onesignalAllow.waitFor(new Locator.WaitForOptions()
-                                .setState(WaitForSelectorState.VISIBLE)
-                                .setTimeout(8000));
-                        onesignalAllow.click();
-                        onesignalAllow.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN));
-                    } catch (Exception e) {
-                        // Ignore
-                    }
-
-                    AutomationHelper.handlePopupsIfPresent(p);
+                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.LOAD));
 
                     Locator modal = p.locator("#quickContact");
-                    if (!modal.isVisible()) {
-                        Locator floatingBtn = p.locator("button.floating-contact-btn");
-                        if (floatingBtn.count() > 0 && floatingBtn.isVisible()) {
-                            floatingBtn.click();
-                        }
+                    Locator floatingBtn = p.locator("button.floating-contact-btn");
+
+                    boolean modalVisible = false;
+                    try {
+                        // Check if the form is already open / visible
+                        modal.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(3000));
+                        modalVisible = true;
+                    } catch (Exception e) {
+                        // Modal did not appear automatically
                     }
-                    modal.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+
+                    if (!modalVisible) {
+                        // If not open, wait for the floating contact/mail button and click it to open the form
+                        floatingBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(12000));
+                        floatingBtn.click();
+                    }
 
                     boolean form1Success = AutomationHelper.fillAndSubmitForm(p, "#quickContact", browserType);
 

@@ -36,10 +36,12 @@ public class FailureHandler {
             String friendlyBrowser = browserName;
             if ("chromium".equalsIgnoreCase(browserName)) {
                 friendlyBrowser = "Chrome";
+            /*
             } else if ("firefox".equalsIgnoreCase(browserName)) {
                 friendlyBrowser = "Firefox";
             } else if ("webkit".equalsIgnoreCase(browserName)) {
                 friendlyBrowser = "WebKit";
+            */
             }
 
             // Create directories: screenshots/<module-name>/<friendlyBrowser>/

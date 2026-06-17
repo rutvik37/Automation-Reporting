@@ -35,7 +35,7 @@ public class ExtentReportListener implements ITestListener {
             ExtentSparkReporter spark = new ExtentSparkReporter(REPORT_FILE);
             spark.config().setTheme(Theme.DARK);
             spark.config().setDocumentTitle("Automation Execution Report");
-            spark.config().setReportName("Playwright Java + TestNG — Parallel Browser Execution");
+            spark.config().setReportName("Playwright Java + TestNG — Chrome Browser Execution");
             spark.config().setTimeStampFormat("yyyy-MM-dd HH:mm:ss");
 
             extent = new ExtentReports();
@@ -64,10 +64,12 @@ public class ExtentReportListener implements ITestListener {
             browser = params[0].toString();
             if ("chromium".equalsIgnoreCase(browser))
                 browser = "Chrome";
-            else if ("firefox".equalsIgnoreCase(browser))
-                browser = "Firefox";
-            else if ("webkit".equalsIgnoreCase(browser))
-                browser = "WebKit";
+            /*
+             * else if ("firefox".equalsIgnoreCase(browser))
+             * browser = "Firefox";
+             * else if ("webkit".equalsIgnoreCase(browser))
+             * browser = "WebKit";
+             */
         }
 
         ExtentTest test = createExtentInstance()

@@ -38,12 +38,12 @@ jobs:
       - name: Install Playwright Browsers
         run: |
           mvn compile exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI \
-            -Dexec.args="install --with-deps" \
+            -Dexec.args="install chromium --with-deps" \
             -Dexec.classpathScope=compile \
             --no-transfer-progress
 
       # ─── Run Tests ───────────────────────────────────────────────────────────
-      - name: Run TestNG Parallel Tests
+      - name: Run TestNG Chrome Test
         run: mvn clean test --no-transfer-progress
         env:
           PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "true"
