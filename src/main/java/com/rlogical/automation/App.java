@@ -14,18 +14,33 @@ public class App {
             java.io.File tessFolder = net.sourceforge.tess4j.util.LoadLibs.extractTessResources(resourcePrefix);
             java.io.File leptFolder = net.sourceforge.lept4j.util.LoadLibs.extractNativeResources(resourcePrefix);
             String currentPath = System.getProperty("jna.library.path");
-            String newPath = tessFolder.getAbsolutePath() + java.io.File.pathSeparator + leptFolder.getAbsolutePath();
+            String newPath = "";
+
+            if (tessFolder != null) {
+                newPath += tessFolder.getAbsolutePath();
+            }
+            if (leptFolder != null) {
+                if (!newPath.isEmpty()) {
+                    newPath += java.io.File.pathSeparator;
+                }
+                newPath += leptFolder.getAbsolutePath();
+            }
 
             // For macOS, we still want to append Homebrew paths if they are not already there
             String os = System.getProperty("os.name").toLowerCase();
             if (os.contains("mac")) {
-                newPath = newPath + java.io.File.pathSeparator + "/opt/homebrew/lib" + java.io.File.pathSeparator + "/usr/local/lib";
+                if (!newPath.isEmpty()) {
+                    newPath += java.io.File.pathSeparator;
+                }
+                newPath += "/opt/homebrew/lib" + java.io.File.pathSeparator + "/usr/local/lib";
             }
 
-            if (currentPath != null && !currentPath.isEmpty()) {
-                newPath = newPath + java.io.File.pathSeparator + currentPath;
+            if (!newPath.isEmpty()) {
+                if (currentPath != null && !currentPath.isEmpty()) {
+                    newPath = newPath + java.io.File.pathSeparator + currentPath;
+                }
+                System.setProperty("jna.library.path", newPath);
             }
-            System.setProperty("jna.library.path", newPath);
         } catch (Throwable t) {
             System.err.println("Warning: Failed to programmatically extract native libraries: " + t.getMessage());
         }

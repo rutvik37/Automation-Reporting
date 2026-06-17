@@ -12,7 +12,7 @@ public class Module2_ContactFormFlow {
     public static boolean execute(Page page, String browserType) {
         return com.rlogical.automation.utils.FailureHandler.runWithFailureHandling(page, "Module2", browserType,
                 (p) -> {
-                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.LOAD));
+                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
 
                     // Close the quickContact popup modal if it appears and blocks the page
                     Locator quickContactModal = p.locator("#quickContact");

@@ -13,7 +13,7 @@ public class Module1_FormFlow {
     public static boolean execute(Page page, String browserType) {
         return com.rlogical.automation.utils.FailureHandler.runWithFailureHandling(page, "Module1", browserType,
                 (p) -> {
-                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.LOAD));
+                    p.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
 
                     Locator modal = p.locator("#quickContact");
                     Locator floatingBtn = p.locator("button.floating-contact-btn");

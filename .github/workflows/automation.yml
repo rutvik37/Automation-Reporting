@@ -29,10 +29,20 @@ jobs:
           cache: maven
 
       # ─── System Dependencies ─────────────────────────────────────────────────
-      - name: Install Tesseract OCR & Leptonica Libraries
+      - name: Install Tesseract OCR & Leptonica Build Deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y tesseract-ocr libleptonica-dev libtesseract-dev
+          sudo apt-get install -y tesseract-ocr libleptonica-dev libtesseract-dev autoconf automake libtool pkg-config libpng-dev libjpeg-dev libtiff-dev zlib1g-dev
+
+      - name: Build Leptonica 1.84.1 from Source
+        run: |
+          git clone --depth 1 -b 1.84.1 https://github.com/DanBloomberg/leptonica.git
+          cd leptonica
+          ./autogen.sh
+          ./configure --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
 
       # ─── Playwright Browsers ─────────────────────────────────────────────────
       - name: Install Playwright Browsers & System Deps
