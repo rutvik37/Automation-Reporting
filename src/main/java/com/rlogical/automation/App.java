@@ -5,12 +5,10 @@ import com.rlogical.automation.utils.BrowserLauncher;
 
 public class App {
     static {
-        // Set native library path for JNA depending on the operating system
+        // Set native library path for JNA to find Homebrew's libtesseract on macOS
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("mac")) {
             System.setProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib");
-        } else if (!os.contains("win")) {
-            System.setProperty("jna.library.path", "/usr/lib/x86_64-linux-gnu:/usr/lib");
         }
         // Turn off SLF4J simple logging completely
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "off");
