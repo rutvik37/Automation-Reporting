@@ -16,10 +16,26 @@ import java.nio.file.Paths;
 
 public class AutomationHelper {
     static {
-        // Set native library path for JNA to find Homebrew's libtesseract on macOS
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("mac")) {
-            System.setProperty("jna.library.path", "/opt/homebrew/lib:/usr/local/lib");
+        // Extract native libraries to temp directory and set jna.library.path to prioritize them
+        try {
+            String resourcePrefix = com.sun.jna.Platform.RESOURCE_PREFIX;
+            java.io.File tessFolder = net.sourceforge.tess4j.util.LoadLibs.extractTessResources(resourcePrefix);
+            java.io.File leptFolder = net.sourceforge.lept4j.util.LoadLibs.extractNativeResources(resourcePrefix);
+            String currentPath = System.getProperty("jna.library.path");
+            String newPath = tessFolder.getAbsolutePath() + java.io.File.pathSeparator + leptFolder.getAbsolutePath();
+
+            // For macOS, we still want to append Homebrew paths if they are not already there
+            String os = System.getProperty("os.name").toLowerCase();
+            if (os.contains("mac")) {
+                newPath = newPath + java.io.File.pathSeparator + "/opt/homebrew/lib" + java.io.File.pathSeparator + "/usr/local/lib";
+            }
+
+            if (currentPath != null && !currentPath.isEmpty()) {
+                newPath = newPath + java.io.File.pathSeparator + currentPath;
+            }
+            System.setProperty("jna.library.path", newPath);
+        } catch (Throwable t) {
+            System.err.println("Warning: Failed to programmatically extract native libraries: " + t.getMessage());
         }
     }
     private static final String TESSDATA_PATH = "tessdata";
