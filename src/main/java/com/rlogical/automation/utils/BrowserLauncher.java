@@ -39,8 +39,11 @@ public class BrowserLauncher implements AutoCloseable {
 
         try {
             this.playwright = Playwright.create();
+            boolean isCI = System.getenv("CI") != null && "true".equalsIgnoreCase(System.getenv("CI"));
+            boolean finalHeadless = headless || isCI;
+
             BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
-                    .setHeadless(headless);
+                    .setHeadless(finalHeadless);
 
             /*
             if ("firefox".equalsIgnoreCase(browserType)) {
