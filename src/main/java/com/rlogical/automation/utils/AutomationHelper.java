@@ -148,57 +148,126 @@ public class AutomationHelper {
                     // Ignore
                 }
 
+                // Log URL and submit button state before clicking submit
+                System.out.println("[" + browserType + "] URL before submit: " + page.url());
+                System.out.println("[" + browserType + "] Submit button state: visible=" + submitBtn.isVisible() + ", enabled=" + submitBtn.isEnabled());
+
                 page.waitForTimeout(2000); // Wait 2 seconds before submitting form
                 submitBtn.click();
 
                 // Quick, responsive poll for success or validation error
                 boolean isSuccess = false;
                 boolean isComplete = false;
+                String successMsg = "";
+                String validationError = "";
+                String captchaErrorText = "";
+
                 long startTime = System.currentTimeMillis();
-                long maxWaitMs = 15000; // max 15 seconds wait for AJAX response
+                long maxWaitMs = 20000; // max 20 seconds wait for AJAX/redirection response
 
                 while (System.currentTimeMillis() - startTime < maxWaitMs) {
                     try {
-                        // 1. Check URL for success redirection
                         String currentUrl = page.url();
+
+                        // 1. Priority: URL change (redirection)
                         if (currentUrl.contains("/thank-you/") || currentUrl.contains("thank")) {
-                            // Wait for the text to appear on the page to ensure successful redirection and display
-                            try {
-                                page.locator("text=Thank You for Contacting Us").waitFor(new Locator.WaitForOptions().setTimeout(5000));
-                                isSuccess = true;
-                            } catch (Exception e) {
-                                // Fallback: check if the page body text contains it
-                                String bodyText = page.locator("body").innerText();
-                                if (bodyText.contains("Thank You for Contacting Us") || bodyText.toLowerCase().contains("thank you")) {
-                                    isSuccess = true;
-                                } else {
-                                    isSuccess = false;
-                                }
-                            }
+                            isSuccess = true;
                             isComplete = true;
+                            successMsg = "Redirected to thank you page: " + currentUrl;
                             break;
                         }
 
-                        // 2. Check response output element for validation message
+                        // Find the form element to check native class states
+                        Locator formEl = container.locator("form").count() > 0 ? container.locator("form").first() : container;
+                        String formClass = (String) formEl.evaluate("el => el.className");
+
+                        // 2. Priority: Contact Form 7 native class states
+                        if (formClass != null) {
+                            if (formClass.contains("sent") || formClass.contains("mail-sent-ok")) {
+                                isSuccess = true;
+                                isComplete = true;
+                                successMsg = "Form class has sent state: " + formClass;
+                                break;
+                            }
+                            if (formClass.contains("invalid") || formClass.contains("failed") || formClass.contains("spam")) {
+                                isSuccess = false;
+                                isComplete = true;
+                                validationError = "Form class has error state: " + formClass;
+                                break;
+                            }
+                        }
+
+                        // 3. Priority: Response output element text
                         Locator responseOutput = container.locator("div.wpcf7-response-output").first();
                         if (responseOutput.count() > 0 && responseOutput.isVisible()) {
                             String responseText = responseOutput.innerText().trim();
                             if (!responseText.isEmpty()) {
+                                successMsg = "Response output text: " + responseText;
+                                // Check if it is a success message
                                 if (responseText.toLowerCase().contains("thank you")
                                         || responseText.toLowerCase().contains("sent")
                                         || responseText.toLowerCase().contains("success")
                                         || responseText.contains("Thank You for Contacting Us")) {
                                     isSuccess = true;
+                                } else {
+                                    isSuccess = false;
+                                    validationError = "Response output indicates failure: " + responseText;
                                 }
                                 isComplete = true;
                                 break;
                             }
                         }
+
+                        // 4. Priority: Check for validation tip messages (e.g. captcha error or empty fields)
+                        Locator validationTips = container.locator(".wpcf7-not-valid-tip");
+                        if (validationTips.count() > 0) {
+                            StringBuilder errors = new StringBuilder();
+                            for (int i = 0; i < validationTips.count(); i++) {
+                                if (validationTips.nth(i).isVisible()) {
+                                    String errText = validationTips.nth(i).innerText().trim();
+                                    errors.append("[").append(errText).append("] ");
+                                    if (errText.toLowerCase().contains("captcha") || errText.toLowerCase().contains("code")) {
+                                        captchaErrorText = errText;
+                                    }
+                                }
+                            }
+                            if (errors.length() > 0) {
+                                isSuccess = false;
+                                isComplete = true;
+                                validationError = "Validation tips visible: " + errors.toString();
+                                break;
+                            }
+                        }
+
                     } catch (Exception e) {
                         // Ignore exceptions caused by page unloading/navigating during submit
                     }
 
                     page.waitForTimeout(200);
+                }
+
+                // Log URL and success/error details after attempt
+                System.out.println("[" + browserType + "] URL after submit: " + page.url());
+                if (isSuccess) {
+                    System.out.println("[" + browserType + "] Success detected! Message: " + successMsg);
+                } else {
+                    System.err.println("[" + browserType + "] Failure detected!");
+                    if (!validationError.isEmpty()) {
+                        System.err.println("[" + browserType + "] Validation Error: " + validationError);
+                    }
+                    if (!captchaErrorText.isEmpty()) {
+                        System.err.println("[" + browserType + "] Captcha Error: " + captchaErrorText);
+                    }
+                }
+
+                // Take screenshot after submit
+                try {
+                    new File("screenshots").mkdirs();
+                    String screenshotName = "screenshots/after_submit_" + browserType + "_attempt_" + submitAttempt + ".png";
+                    page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(screenshotName)));
+                    System.out.println("[" + browserType + "] Saved screenshot: " + screenshotName);
+                } catch (Exception e) {
+                    System.err.println("[" + browserType + "] Failed to take screenshot: " + e.getMessage());
                 }
 
                 if (isSuccess) {
