@@ -2,6 +2,7 @@ package com.rlogical.automation;
 
 import com.rlogical.automation.modules.Module1_FormFlow;
 import com.rlogical.automation.modules.Module2_ContactFormFlow;
+import com.rlogical.automation.modules.Module3_CloudServiceCompanyFormFlow;
 import com.rlogical.automation.utils.BrowserLauncher;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -50,9 +51,8 @@ public class BrowserTest {
     }
 
     @Parameters("browser")
-
     @Test
-    public void runBrowserTest(String browserName) {
+    public void runBrowserTest(@org.testng.annotations.Optional("chrome") String browserName) {
         boolean success = false;
 
         // Run full parallel execution (headless=false / visible, as per request)
@@ -80,7 +80,7 @@ public class BrowserTest {
 
     @Parameters("browser")
     @Test
-    public void runBrowserTest2(String browserName) {
+    public void runBrowserTest2(@org.testng.annotations.Optional("chrome") String browserName) {
         boolean success = false;
 
         try (BrowserLauncher launcher = new BrowserLauncher(browserName, false)) {
@@ -103,5 +103,32 @@ public class BrowserTest {
         }
 
         org.testng.Assert.assertTrue(success, "Contact form submission failed in " + friendlyName.toLowerCase());
+    }
+
+    @Parameters("browser")
+    @Test
+    public void runBrowserTest3(@org.testng.annotations.Optional("chrome") String browserName) {
+        boolean success = false;
+
+        try (BrowserLauncher launcher = new BrowserLauncher(browserName, false)) {
+            // Execute Module 3.
+            success = Module3_CloudServiceCompanyFormFlow.execute(launcher.page, browserName);
+        } catch (Exception e) {
+            e.printStackTrace(); // Print launch exceptions to console for visibility
+            success = false;
+        }
+
+        String friendlyName = browserName;
+        if ("chromium".equalsIgnoreCase(browserName)) {
+            friendlyName = "chrome";
+        }
+
+        if (success) {
+            System.out.println("cloud service company form submitted successfully in " + friendlyName.toLowerCase());
+        } else {
+            System.out.println("cloud service company form submission failed in " + friendlyName.toLowerCase());
+        }
+
+        org.testng.Assert.assertTrue(success, "Cloud service company form submission failed in " + friendlyName.toLowerCase());
     }
 }

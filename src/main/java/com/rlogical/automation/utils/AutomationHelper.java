@@ -54,6 +54,7 @@ public class AutomationHelper {
         }
     }
     private static final String TESSDATA_PATH = "tessdata";
+    public static boolean enablePopupWatcher = false;
 
     // Static form data values
     private static final String STATIC_NAME = "Tester Testing";
@@ -62,11 +63,92 @@ public class AutomationHelper {
     private static final String STATIC_COMPANY = "Testing company";
     private static final String STATIC_DESCRIPTION = "Testing Decription for verify these functionality";
 
+    public static java.util.List<String> getMissingFields(Locator container) {
+        java.util.List<String> missingFields = new java.util.ArrayList<>();
+
+        Locator fnameField = container.locator("input[name='fname']").first();
+        if (fnameField.count() == 0 || fnameField.inputValue().trim().isEmpty()) {
+            missingFields.add("Name");
+        }
+
+        Locator emailField = container.locator("input[name='email']").first();
+        if (emailField.count() == 0 || emailField.inputValue().trim().isEmpty()) {
+            missingFields.add("Email");
+        }
+
+        Locator mobileField = container.locator("input[name='mobile']").first();
+        if (mobileField.count() == 0 || mobileField.inputValue().trim().isEmpty()) {
+            missingFields.add("Phone");
+        }
+
+        Locator companyField = container.locator("input[name='company']").first();
+        if (companyField.count() == 0 || companyField.inputValue().trim().isEmpty()) {
+            missingFields.add("Company");
+        }
+
+        Locator describeField = container.locator("textarea[name='describe']").first();
+        if (describeField.count() == 0 || describeField.inputValue().trim().isEmpty()) {
+            missingFields.add("Project Details");
+        }
+
+        Locator captchaInput = container.locator("input.wpcf7-captchar, input[placeholder*='captcha'], input[name^='captcha-']").first();
+        if (captchaInput.count() == 0 || captchaInput.inputValue().trim().isEmpty()) {
+            missingFields.add("Captcha");
+        }
+
+        return missingFields;
+    }
+
+    public static void fillMissingFields(Page page, Locator container, java.util.List<String> missingFields, String browserType) {
+        if (missingFields == null || missingFields.isEmpty()) {
+            return;
+        }
+
+        for (String field : missingFields) {
+            switch (field) {
+                case "Name":
+                    Locator fnameField = container.locator("input[name='fname']").first();
+                    safeWaitFor(page, fnameField, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    safeFill(page, fnameField, STATIC_NAME);
+                    break;
+                case "Email":
+                    Locator emailField = container.locator("input[name='email']").first();
+                    safeWaitFor(page, emailField, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    safeFill(page, emailField, STATIC_EMAIL);
+                    break;
+                case "Phone":
+                    Locator mobileField = container.locator("input[name='mobile']").first();
+                    safeWaitFor(page, mobileField, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    String cleanedMobile = STATIC_MOBILE.replaceAll("[^0-9]", "");
+                    if (cleanedMobile.length() > 10) {
+                        cleanedMobile = cleanedMobile.substring(cleanedMobile.length() - 10);
+                    }
+                    safeFill(page, mobileField, cleanedMobile);
+                    break;
+                case "Company":
+                    Locator companyField = container.locator("input[name='company']").first();
+                    safeWaitFor(page, companyField, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    safeFill(page, companyField, STATIC_COMPANY);
+                    break;
+                case "Project Details":
+                    Locator describeField = container.locator("textarea[name='describe']").first();
+                    safeWaitFor(page, describeField, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    safeFill(page, describeField, STATIC_DESCRIPTION);
+                    break;
+                case "Captcha":
+                    Locator captchaImg = container.locator("img.wpcf7-captchac, img[alt='captcha'], img[src*='captcha']").first();
+                    Locator captchaInput = container.locator("input.wpcf7-captchar, input[placeholder*='captcha'], input[name^='captcha-']").first();
+                    solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
+                    break;
+            }
+        }
+    }
+
     public static boolean fillAndSubmitForm(Page page, String containerSelector, String browserType) {
         Locator container = page.locator(containerSelector).first();
 
         try {
-            container.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+            safeWaitFor(page, container, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
         } catch (Exception e) {
             System.err.println("[" + browserType + "] Error: Form container " + containerSelector + " not visible.");
             return false;
@@ -77,8 +159,8 @@ public class AutomationHelper {
                 .locator("input.wpcf7-captchar, input[placeholder*='captcha'], input[name^='captcha-']").first();
 
         try {
-            captchaImg.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
-            captchaInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
+            safeWaitFor(page, captchaImg, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
+            safeWaitFor(page, captchaInput, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
         } catch (Exception e) {
             System.err.println("[" + browserType + "] Error: Captcha image or input element not found in form.");
             return false;
@@ -90,43 +172,123 @@ public class AutomationHelper {
 
         try {
             for (int submitAttempt = 1; submitAttempt <= maxSubmitAttempts; submitAttempt++) {
-                if (submitAttempt == 1) {
-                    fillDummyDataForForm(page, container);
-                } else {
-                    // Wait for the captcha image src or challenge ID to change from lastImgSrc / lastChallengeId
-                    long refreshStart = System.currentTimeMillis();
-                    while (System.currentTimeMillis() - refreshStart < 5000) { // max 5 seconds wait for refresh
-                        String currentChallengeId = getCaptchaChallengeId(container);
-                        String currentImgSrc = "";
+                if (containerSelector.equals("#quickContact")) {
+                    if (submitAttempt == 1) {
+                        fillDummyDataForForm(page, container);
+                        solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
+
+                        int validationAttempts = 0;
+                        int maxValidationAttempts = 5;
+                        java.util.List<String> missingFields = getMissingFields(container);
+
+                        if (!missingFields.isEmpty()) {
+                            System.out.println("Missing mandatory fields:");
+                            for (String field : missingFields) {
+                                System.out.println("* " + field);
+                            }
+                            System.out.println();
+                            System.out.println("Refilling missing fields only.");
+
+                            while (!missingFields.isEmpty() && validationAttempts < maxValidationAttempts) {
+                                fillMissingFields(page, container, missingFields, browserType);
+                                missingFields = getMissingFields(container);
+                                validationAttempts++;
+                            }
+                        }
+
+                        if (missingFields.isEmpty()) {
+                            System.out.println("All mandatory fields verified successfully.");
+                        } else {
+                            System.err.println("[" + browserType + "] Error: Mandatory fields not filled successfully after validation.");
+                            return false;
+                        }
+                    } else {
+                        System.out.println("Submission failed.");
+                        System.out.println("Rechecking field values.");
+                        System.out.println();
+
+                        // Wait for new captcha
+                        long refreshStart = System.currentTimeMillis();
+                        while (System.currentTimeMillis() - refreshStart < 5000) { // max 5 seconds wait for refresh
+                            String currentChallengeId = getCaptchaChallengeId(container);
+                            String currentImgSrc = "";
+                            try {
+                                currentImgSrc = captchaImg.getAttribute("src");
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                            if ((currentChallengeId != null && !currentChallengeId.equals(lastChallengeId))
+                                    || (currentImgSrc != null && !currentImgSrc.equals(lastImgSrc))) {
+                                break;
+                            }
+                            page.waitForTimeout(100);
+                        }
+                        // Give a tiny buffer for image to load/render
+                        page.waitForTimeout(200);
+
+                        // Clear captcha input to force solving a fresh captcha
                         try {
-                            currentImgSrc = captchaImg.getAttribute("src");
+                            safeFill(page, captchaInput, "");
                         } catch (Exception e) {
                             // Ignore
                         }
-                        if ((currentChallengeId != null && !currentChallengeId.equals(lastChallengeId))
-                                || (currentImgSrc != null && !currentImgSrc.equals(lastImgSrc))) {
-                            break;
-                        }
-                        page.waitForTimeout(100);
-                    }
-                    // Give a tiny buffer for image to load/render
-                    page.waitForTimeout(200);
 
-                    // Refill all fields (name, email, number, company, description) on retry
-                    fillDummyDataForForm(page, container);
+                        java.util.List<String> missingFields = getMissingFields(container);
+
+                        System.out.println("Refilling:");
+                        for (String field : missingFields) {
+                            System.out.println("* " + field);
+                        }
+                        System.out.println();
+
+                        // Fill missing fields only
+                        int validationAttempts = 0;
+                        int maxValidationAttempts = 5;
+                        while (!missingFields.isEmpty() && validationAttempts < maxValidationAttempts) {
+                            fillMissingFields(page, container, missingFields, browserType);
+                            missingFields = getMissingFields(container);
+                            validationAttempts++;
+                        }
+
+                        System.out.println("Retrying submission.");
+                    }
+                } else {
+                    // Legacy non-Module 1 form flow
+                    if (submitAttempt == 1) {
+                        fillDummyDataForForm(page, container);
+                    } else {
+                        // Wait for new captcha
+                        long refreshStart = System.currentTimeMillis();
+                        while (System.currentTimeMillis() - refreshStart < 5000) {
+                            String currentChallengeId = getCaptchaChallengeId(container);
+                            String currentImgSrc = "";
+                            try {
+                                currentImgSrc = captchaImg.getAttribute("src");
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                            if ((currentChallengeId != null && !currentChallengeId.equals(lastChallengeId))
+                                    || (currentImgSrc != null && !currentImgSrc.equals(lastImgSrc))) {
+                                break;
+                            }
+                            page.waitForTimeout(100);
+                        }
+                        page.waitForTimeout(200);
+                        fillDummyDataForForm(page, container);
+                    }
+
+                    boolean captchaSolved = solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
+                    if (!captchaSolved) {
+                        System.err.println("[" + browserType + "] Error: Captcha solving failed.");
+                        return false;
+                    }
                 }
 
                 Locator submitBtn = container.locator("input[type='submit']").first();
                 try {
-                    submitBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                    safeWaitFor(page, submitBtn, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
                 } catch (Exception e) {
                     System.err.println("[" + browserType + "] Error: Submit button not visible.");
-                    return false;
-                }
-
-                boolean captchaSolved = solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
-                if (!captchaSolved) {
-                    System.err.println("[" + browserType + "] Error: Captcha solving failed.");
                     return false;
                 }
 
@@ -152,112 +314,97 @@ public class AutomationHelper {
                 System.out.println("[" + browserType + "] URL before submit: " + page.url());
                 System.out.println("[" + browserType + "] Submit button state: visible=" + submitBtn.isVisible() + ", enabled=" + submitBtn.isEnabled());
 
-                page.waitForTimeout(2000); // Wait 2 seconds before submitting form
-                submitBtn.click();
+                if (submitAttempt == 1) {
+                    page.waitForTimeout(500); // Wait 0.5 seconds on first attempt
+                } else {
+                    page.waitForTimeout(100); // Wait 0.1 seconds on retry attempts
+                }
+                safeClick(page, submitBtn);
 
-                // Quick, responsive poll for success or validation error
+                // Quick, responsive poll for success (URL redirect)
                 boolean isSuccess = false;
-                boolean isComplete = false;
-                String successMsg = "";
-                String validationError = "";
-                String captchaErrorText = "";
 
                 long startTime = System.currentTimeMillis();
-                long maxWaitMs = 20000; // max 20 seconds wait for AJAX/redirection response
+                long maxWaitMs = 20000; // max 20 seconds wait for redirection response
 
                 while (System.currentTimeMillis() - startTime < maxWaitMs) {
                     try {
                         String currentUrl = page.url();
-
-                        // 1. Priority: URL change (redirection)
-                        if (currentUrl.contains("/thank-you/") || currentUrl.contains("thank")) {
+                        if (currentUrl.startsWith("https://uat.rlogical.com/thank-you/") || currentUrl.equals("https://uat.rlogical.com/thank-you")) {
                             isSuccess = true;
-                            isComplete = true;
-                            successMsg = "Redirected to thank you page: " + currentUrl;
                             break;
                         }
 
-                        // Find the form element to check native class states
-                        Locator formEl = container.locator("form").count() > 0 ? container.locator("form").first() : container;
-                        String formClass = (String) formEl.evaluate("el => el.className");
-
-                        // 2. Priority: Contact Form 7 native class states
-                        if (formClass != null) {
-                            if (formClass.contains("sent") || formClass.contains("mail-sent-ok")) {
-                                isSuccess = true;
-                                isComplete = true;
-                                successMsg = "Form class has sent state: " + formClass;
-                                break;
-                            }
-                            if (formClass.contains("invalid") || formClass.contains("failed") || formClass.contains("spam")) {
-                                isSuccess = false;
-                                isComplete = true;
-                                validationError = "Form class has error state: " + formClass;
-                                break;
-                            }
-                        }
-
-                        // 3. Priority: Response output element text
-                        Locator responseOutput = container.locator("div.wpcf7-response-output").first();
-                        if (responseOutput.count() > 0 && responseOutput.isVisible()) {
-                            String responseText = responseOutput.innerText().trim();
-                            if (!responseText.isEmpty()) {
-                                successMsg = "Response output text: " + responseText;
-                                // Check if it is a success message
-                                if (responseText.toLowerCase().contains("thank you")
-                                        || responseText.toLowerCase().contains("sent")
-                                        || responseText.toLowerCase().contains("success")
-                                        || responseText.contains("Thank You for Contacting Us")) {
-                                    isSuccess = true;
-                                } else {
-                                    isSuccess = false;
-                                    validationError = "Response output indicates failure: " + responseText;
+                        // Early Failure Detection: check native class states on form element
+                        Locator formEl = container;
+                        if (!container.evaluate("el => el.tagName").equals("FORM")) {
+                            if (container.locator("form").count() > 0) {
+                                formEl = container.locator("form").first();
+                            } else {
+                                try {
+                                    Locator ancestorForm = container.locator("xpath=./ancestor::form").first();
+                                    if (ancestorForm.count() > 0) {
+                                        formEl = ancestorForm;
+                                    }
+                                } catch (Exception e) {
+                                    // Ignore
                                 }
-                                isComplete = true;
-                                break;
                             }
                         }
+                        String formClass = (String) formEl.evaluate("el => el.className");
+                        if (formClass != null && (formClass.contains("invalid") || formClass.contains("failed") || formClass.contains("spam"))) {
+                            System.out.println("[" + browserType + "] Early failure detected via form class: " + formClass);
+                            break;
+                        }
 
-                        // 4. Priority: Check for validation tip messages (e.g. captcha error or empty fields)
+                        // Early Failure Detection: check for validation tips
                         Locator validationTips = container.locator(".wpcf7-not-valid-tip");
                         if (validationTips.count() > 0) {
-                            StringBuilder errors = new StringBuilder();
+                            boolean hasVisibleTip = false;
                             for (int i = 0; i < validationTips.count(); i++) {
                                 if (validationTips.nth(i).isVisible()) {
-                                    String errText = validationTips.nth(i).innerText().trim();
-                                    errors.append("[").append(errText).append("] ");
-                                    if (errText.toLowerCase().contains("captcha") || errText.toLowerCase().contains("code")) {
-                                        captchaErrorText = errText;
-                                    }
+                                    hasVisibleTip = true;
+                                    break;
                                 }
                             }
-                            if (errors.length() > 0) {
-                                isSuccess = false;
-                                isComplete = true;
-                                validationError = "Validation tips visible: " + errors.toString();
+                            if (hasVisibleTip) {
+                                System.out.println("[" + browserType + "] Early failure detected via validation tips.");
                                 break;
                             }
                         }
 
+                        // Early Failure Detection: check for error in response output
+                        Locator responseOutput = container.locator("div.wpcf7-response-output").first();
+                        if (responseOutput.count() == 0 || !responseOutput.isVisible()) {
+                            try {
+                                Locator ancestorForm = container.locator("xpath=./ancestor::form").first();
+                                if (ancestorForm.count() > 0) {
+                                    responseOutput = ancestorForm.locator("div.wpcf7-response-output").first();
+                                }
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                        }
+                        if (responseOutput.count() > 0 && responseOutput.isVisible()) {
+                            String responseText = responseOutput.innerText().trim();
+                            if (!responseText.isEmpty() && !responseText.toLowerCase().contains("thank you") && 
+                                !responseText.toLowerCase().contains("sent") && !responseText.toLowerCase().contains("success")) {
+                                System.out.println("[" + browserType + "] Early failure detected via response output: " + responseText);
+                                break;
+                            }
+                        }
                     } catch (Exception e) {
                         // Ignore exceptions caused by page unloading/navigating during submit
                     }
-
                     page.waitForTimeout(200);
                 }
 
                 // Log URL and success/error details after attempt
                 System.out.println("[" + browserType + "] URL after submit: " + page.url());
                 if (isSuccess) {
-                    System.out.println("[" + browserType + "] Success detected! Message: " + successMsg);
+                    System.out.println("[" + browserType + "] Success detected! Redirected to thank you page.");
                 } else {
-                    System.err.println("[" + browserType + "] Failure detected!");
-                    if (!validationError.isEmpty()) {
-                        System.err.println("[" + browserType + "] Validation Error: " + validationError);
-                    }
-                    if (!captchaErrorText.isEmpty()) {
-                        System.err.println("[" + browserType + "] Captcha Error: " + captchaErrorText);
-                    }
+                    System.err.println("[" + browserType + "] Failure detected! Did not redirect to https://uat.rlogical.com/thank-you/");
                 }
 
                 // Take screenshot after submit
@@ -274,11 +421,7 @@ public class AutomationHelper {
                     return true;
                 }
 
-                if (!isComplete) {
-                    System.err.println("[" + browserType + "] Attempt " + submitAttempt + " timed out waiting for redirection.");
-                } else {
-                    System.err.println("[" + browserType + "] Attempt " + submitAttempt + " failed to redirect/show success message.");
-                }
+                System.err.println("[" + browserType + "] Attempt " + submitAttempt + " timed out or failed waiting for redirection.");
                 continue;
             }
         } finally {
@@ -317,8 +460,8 @@ public class AutomationHelper {
 
         for (int attempt = 1; attempt <= maxCaptchaAttempts; attempt++) {
             try {
-                captchaImg.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-                captchaInput.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                safeWaitFor(page, captchaImg, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+                safeWaitFor(page, captchaInput, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
             } catch (Exception e) {
                 return false;
             }
@@ -329,6 +472,7 @@ public class AutomationHelper {
             if (extractedCode == null || extractedCode.trim().isEmpty()) {
                 try {
                     Files.createDirectories(Paths.get("scratch"));
+                    checkAndDismissPopup(page);
                     captchaImg.screenshot(new Locator.ScreenshotOptions().setPath(Paths.get(rawPath)));
 
                     String rawText = doTesseractOCR(rawPath);
@@ -367,8 +511,8 @@ public class AutomationHelper {
                 continue;
             }
 
-            captchaInput.fill(extractedCode);
-            page.waitForTimeout(1500); // Wait 1.5 seconds after filling captcha
+            safeFill(page, captchaInput, extractedCode);
+            page.waitForTimeout(200); // Wait 200ms after filling captcha to register value
 
             String enteredVal = captchaInput.inputValue();
             String finalChallenge = getCaptchaChallengeId(container);
@@ -390,39 +534,59 @@ public class AutomationHelper {
     }
 
     public static void fillDummyDataForForm(Page page, Locator container) {
-        Locator companyField = container.locator("input[name='company']").first();
-        companyField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        companyField.fill(STATIC_COMPANY);
+        // Name Field
+        Locator nameField = container.locator("[data-name='your-name'] input, input[name='your-name'], input[name='fname'], [data-name='fname'] input").first();
+        if (nameField.count() > 0) {
+            safeFill(page, nameField, STATIC_NAME);
+        }
 
-        Locator fnameField = container.locator("input[name='fname']").first();
-        fnameField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        fnameField.fill(STATIC_NAME);
+        // Email Field
+        Locator emailField = container.locator("input[name='your-email'], [data-name='your-email'] input, input[name='email'], [data-name='email'] input").first();
+        if (emailField.count() > 0) {
+            safeFill(page, emailField, STATIC_EMAIL);
+        }
 
-        Locator emailField = container.locator("input[name='email']").first();
-        emailField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        emailField.fill(STATIC_EMAIL);
-
-        Locator mobileField = container.locator("input[name='mobile']").first();
-        mobileField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+        // Phone Field (supporting visible intl-tel-input, mobile, and hidden fallback)
+        Locator visiblePhone = container.locator("[data-name='your-number'] input, input[type='tel'], input[name='mobile']").first();
+        Locator hiddenPhone = container.locator("input[name='full-phone']").first();
         String cleanedMobile = STATIC_MOBILE.replaceAll("[^0-9]", "");
         if (cleanedMobile.length() > 10) {
             cleanedMobile = cleanedMobile.substring(cleanedMobile.length() - 10);
         }
-        mobileField.fill(cleanedMobile);
+        if (visiblePhone.count() > 0) {
+            safeFill(page, visiblePhone, cleanedMobile);
+        } else if (hiddenPhone.count() > 0) {
+            if (hiddenPhone.isVisible()) {
+                safeFill(page, hiddenPhone, cleanedMobile);
+            } else {
+                checkAndDismissPopup(page);
+                hiddenPhone.evaluate("el => { el.value = '" + cleanedMobile + "'; el.dispatchEvent(new Event('change', { bubbles: true })); }");
+            }
+        }
 
-        Locator categoryField = container.locator("select[name='category']").first();
+        // Company Field
+        Locator companyField = container.locator("input[name='company'], input[name='your-company']").first();
+        if (companyField.count() > 0) {
+            safeFill(page, companyField, STATIC_COMPANY);
+        }
+
+        // Category Select Dropdown
+        Locator categoryField = container.locator("select[name='category'], select[name='your-category']").first();
         if (categoryField.count() > 0 && categoryField.isVisible()) {
-            categoryField.selectOption("Hire Developers");
+            safeSelectOption(page, categoryField, "Hire Developers");
             try {
+                checkAndDismissPopup(page);
                 categoryField.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))");
             } catch (Exception e) {
                 // Ignore
             }
         }
 
-        Locator describeField = container.locator("textarea[name='describe']").first();
-        describeField.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-        describeField.fill(STATIC_DESCRIPTION);
+        // Message/Describe Text Area
+        Locator describeField = container.locator("textarea[name='describe'], textarea[name='your-message'], [data-name='your-message'] textarea").first();
+        if (describeField.count() > 0) {
+            safeFill(page, describeField, STATIC_DESCRIPTION);
+        }
     }
 
     public static void handlePopupsIfPresent(Page page) {
@@ -440,13 +604,13 @@ public class AutomationHelper {
                 }
             }
 
-            Locator consultationModal = page.locator("#rdemo_popup_modal");
+            Locator consultationModal = page.locator("#rdemo_popup_modal, .rdemo_popup_modal, #rdemo_popup");
             if (consultationModal.count() > 0) {
                 try {
                     consultationModal.waitFor(new Locator.WaitForOptions()
                             .setState(WaitForSelectorState.VISIBLE)
                             .setTimeout(2000));
-                    Locator closeBtn = consultationModal.locator("button#close, button[data-dismiss='modal']").first();
+                    Locator closeBtn = consultationModal.locator("button#close, button.btn-close, #close, .close-btn, button[data-dismiss='modal'], button[data-bs-dismiss='modal'], button.close, [aria-label='Close']").first();
                     closeBtn.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
                     closeBtn.click();
                     consultationModal.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN));
@@ -462,7 +626,7 @@ public class AutomationHelper {
                 String id = modal.getAttribute("id");
                 if (id != null && !id.equals("quickContact")) {
                     Locator closeBtn = modal.locator(
-                            "button.btn-close, button[data-bs-dismiss='modal'], button[data-dismiss='modal'], #close")
+                            "button.btn-close, button#close, #close, .close-btn, button[data-bs-dismiss='modal'], button.close, [aria-label='Close']")
                             .first();
                     if (closeBtn.isVisible()) {
                         closeBtn.click();
@@ -569,5 +733,145 @@ public class AutomationHelper {
             sb.append(chars.charAt(index));
         }
         return sb.toString();
+    }
+
+    public static boolean navigateAndSubmit(Page page, String url, String containerSelector, String triggerSelector, String browserType) {
+        // Register dynamic locator handler to close popup modals automatically whenever they appear
+        try {
+            Locator popupOverlay = page.locator("#rdemo_popup_modal, .rdemo_popup_modal, #rdemo_popup").first();
+            page.addLocatorHandler(popupOverlay, (overlay) -> {
+                System.out.println("[Framework] Dynamic popup detected. Closing it.");
+                try {
+                    Locator closeBtn = overlay.locator("button#close, button.btn-close, #close, .close-btn, button[data-dismiss='modal'], button[data-bs-dismiss='modal'], button.close, [aria-label='Close'], .close, span.close").first();
+                    if (closeBtn.isVisible()) {
+                        closeBtn.click();
+                    }
+                } catch (Exception e) {
+                    // Ignore
+                }
+            });
+        } catch (Exception e) {
+            // Ignore if any registration errors
+        }
+
+        try {
+            page.navigate(url, new Page.NavigateOptions().setWaitUntil(com.microsoft.playwright.options.WaitUntilState.COMMIT));
+            checkAndDismissPopup(page);
+        } catch (Exception e) {
+            // Ignore transient navigation errors on early commit
+        }
+
+        long startTime = System.currentTimeMillis();
+        long timeoutMs = 20000;
+        Locator container = page.locator(containerSelector).first();
+        Locator triggerBtn = triggerSelector != null ? page.locator(triggerSelector).first() : null;
+        boolean clickedTrigger = false;
+
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            checkAndDismissPopup(page);
+            handlePopupsIfPresent(page);
+
+            if (container.count() > 0 && container.isVisible()) {
+                break;
+            }
+
+            if (triggerBtn != null && !clickedTrigger && triggerBtn.count() > 0 && triggerBtn.isVisible()) {
+                try {
+                    safeClick(page, triggerBtn);
+                    clickedTrigger = true;
+                } catch (Exception e) {
+                    // Ignore transient click errors
+                }
+            }
+
+            page.waitForTimeout(100);
+        }
+
+        try {
+            safeWaitFor(page, container, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
+        } catch (Exception e) {
+            System.err.println("[" + browserType + "] Error: Target form " + containerSelector + " not visible.");
+            return false;
+        }
+
+        return fillAndSubmitForm(page, containerSelector, browserType);
+    }
+
+    public static void checkAndDismissPopup(Page page) {
+        if (!enablePopupWatcher || page == null) {
+            return;
+        }
+        try {
+            Locator popup = page.locator("#rdemo_popup_modal, .rdemo_popup_modal, #rdemo_popup, div.modal.show").first();
+            if (popup.count() > 0 && popup.isVisible()) {
+                String text = "";
+                try {
+                    text = popup.innerText();
+                } catch (Exception e) {
+                    // Ignore transient DOM detachment
+                }
+                if (text != null && text.contains("Get Free Consultation")) {
+                    System.out.println("[Popup Handler] Popup detected.");
+                    Locator closeBtn = popup.locator("button#close, button.btn-close, #close, .close-btn, button[data-dismiss='modal'], button[data-bs-dismiss='modal'], button.close, [aria-label='Close'], .close, span.close").first();
+                    if (closeBtn.count() > 0 && closeBtn.isVisible()) {
+                        System.out.println("[Popup Handler] Clicking close button.");
+                        closeBtn.click();
+                        try {
+                            popup.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN).setTimeout(2000));
+                            System.out.println("[Popup Handler] Popup closed successfully.");
+                        } catch (Exception e) {
+                            System.err.println("[Popup Handler] Warning: Popup did not close in time.");
+                        }
+                    } else {
+                        // Fallback: search for child elements with class containing 'close' or 'Close'
+                        Locator allChildren = popup.locator("*");
+                        int count = allChildren.count();
+                        boolean clicked = false;
+                        for (int i = 0; i < count; i++) {
+                            Locator child = allChildren.nth(i);
+                            String cls = child.getAttribute("class");
+                            if (cls != null && cls.toLowerCase().contains("close") && child.isVisible()) {
+                                System.out.println("[Popup Handler] Clicking close button (fallback class): " + cls);
+                                child.click();
+                                clicked = true;
+                                break;
+                            }
+                        }
+                        if (clicked) {
+                            try {
+                                popup.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN).setTimeout(2000));
+                                System.out.println("[Popup Handler] Popup closed successfully.");
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                        } else {
+                            System.err.println("[Popup Handler] Close button not found or not visible.");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[Popup Handler] Error occurred during popup check: " + e.getMessage());
+        }
+    }
+
+    private static void safeFill(Page page, Locator locator, String value) {
+        checkAndDismissPopup(page);
+        locator.fill(value);
+    }
+
+    private static void safeClick(Page page, Locator locator) {
+        checkAndDismissPopup(page);
+        locator.click();
+    }
+
+    private static void safeSelectOption(Page page, Locator locator, String value) {
+        checkAndDismissPopup(page);
+        locator.selectOption(value);
+    }
+
+    private static void safeWaitFor(Page page, Locator locator, Locator.WaitForOptions options) {
+        checkAndDismissPopup(page);
+        locator.waitFor(options);
     }
 }
