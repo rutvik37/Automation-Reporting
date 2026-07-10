@@ -8,6 +8,11 @@ import com.aventstack.extentreports.reporter.configuration.Theme;
 import org.testng.ITestContext;
 import org.testng.ITestListener;
 import org.testng.ITestResult;
+import org.testng.IReporter;
+import org.testng.ISuite;
+import org.testng.ISuiteResult;
+import org.testng.IResultMap;
+import org.testng.xml.XmlSuite;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +23,15 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ExtentReportListener implements ITestListener {
+public class ExtentReportListener implements ITestListener, IReporter {
+
+    private static final java.io.PrintStream originalOut = System.out;
+    private static final java.io.PrintStream originalErr = System.err;
+
+    static {
+        System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
+        System.setErr(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
+    }
 
     private static ExtentReports extent;
     private static final ConcurrentHashMap<Long, ExtentTest> testMap = new ConcurrentHashMap<>();
@@ -88,6 +101,22 @@ public class ExtentReportListener implements ITestListener {
 
     @Override
     public void onTestFailure(ITestResult result) {
+        Throwable original = result.getThrowable();
+        if (original != null) {
+            String cleanMessage = "";
+            String methodName = result.getMethod().getMethodName();
+            if ("runBrowserTest".equals(methodName)) {
+                cleanMessage = "Test Case 1 - FAILED";
+            } else if ("runBrowserTest2".equals(methodName)) {
+                cleanMessage = "Test Case 2 - FAILED";
+            } else if ("runBrowserTest3".equals(methodName)) {
+                cleanMessage = "Test Case 3 - FAILED";
+            } else {
+                cleanMessage = original.getMessage();
+            }
+            result.setThrowable(new LightweightTestException(cleanMessage));
+        }
+
         ExtentTest test = getCurrentTest();
         if (test != null) {
             test.log(Status.FAIL, "Test FAILED: " + result.getThrowable());
@@ -140,6 +169,55 @@ public class ExtentReportListener implements ITestListener {
             }
         } catch (Exception e) {
             // Ignore screenshot attachment errors
+        }
+    }
+
+    @Override
+    public void generateReport(java.util.List<XmlSuite> xmlSuites, java.util.List<ISuite> suites, String outputDirectory) {
+        java.util.Map<String, String> statusMap = new java.util.LinkedHashMap<>();
+        statusMap.put("Test Case 1", "NOT RUN");
+        statusMap.put("Test Case 2", "NOT RUN");
+        statusMap.put("Test Case 3", "NOT RUN");
+
+        for (ISuite suite : suites) {
+            java.util.Map<String, ISuiteResult> results = suite.getResults();
+            for (ISuiteResult result : results.values()) {
+                ITestContext context = result.getTestContext();
+                updateStatus(context.getPassedTests(), statusMap, "PASSED");
+                updateStatus(context.getFailedTests(), statusMap, "FAILED");
+                updateStatus(context.getSkippedTests(), statusMap, "SKIPPED");
+            }
+        }
+
+        for (java.util.Map.Entry<String, String> entry : statusMap.entrySet()) {
+            if (!"NOT RUN".equals(entry.getValue())) {
+                originalOut.println(entry.getKey() + " - " + entry.getValue());
+            }
+        }
+    }
+
+    private void updateStatus(IResultMap resultMap, java.util.Map<String, String> statusMap, String status) {
+        if (resultMap == null) return;
+        for (ITestResult result : resultMap.getAllResults()) {
+            String methodName = result.getMethod().getMethodName();
+            if ("runBrowserTest".equals(methodName)) {
+                statusMap.put("Test Case 1", status);
+            } else if ("runBrowserTest2".equals(methodName)) {
+                statusMap.put("Test Case 2", status);
+            } else if ("runBrowserTest3".equals(methodName)) {
+                statusMap.put("Test Case 3", status);
+            }
+        }
+    }
+
+    public static class LightweightTestException extends RuntimeException {
+        public LightweightTestException(String message) {
+            super(message, null, false, false);
+        }
+
+        @Override
+        public String toString() {
+            return getMessage();
         }
     }
 }

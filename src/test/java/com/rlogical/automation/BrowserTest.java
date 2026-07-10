@@ -12,7 +12,8 @@ public class BrowserTest {
         // Force SLF4J simple logging completely off
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "off");
 
-        // Extract native libraries to temp directory and set jna.library.path to prioritize them
+        // Extract native libraries to temp directory and set jna.library.path to
+        // prioritize them
         try {
             String resourcePrefix = com.sun.jna.Platform.RESOURCE_PREFIX;
             java.io.File tessFolder = net.sourceforge.tess4j.util.LoadLibs.extractTessResources(resourcePrefix);
@@ -30,7 +31,8 @@ public class BrowserTest {
                 newPath += leptFolder.getAbsolutePath();
             }
 
-            // For macOS, we still want to append Homebrew paths if they are not already there
+            // For macOS, we still want to append Homebrew paths if they are not already
+            // there
             String os = System.getProperty("os.name").toLowerCase();
             if (os.contains("mac")) {
                 if (!newPath.isEmpty()) {
@@ -60,19 +62,13 @@ public class BrowserTest {
             // Execute Module 1. Future modules can be appended here.
             success = Module1_FormFlow.execute(launcher.page, browserName);
         } catch (Exception e) {
-            e.printStackTrace(); // Print launch exceptions to console for visibility
+            // e.printStackTrace(); // Print launch exceptions to console for visibility
             success = false;
         }
 
         String friendlyName = browserName;
         if ("chromium".equalsIgnoreCase(browserName)) {
             friendlyName = "chrome";
-        }
-
-        if (success) {
-            System.out.println("form submitted successfully in " + friendlyName.toLowerCase());
-        } else {
-            System.out.println("form submission failed in " + friendlyName.toLowerCase());
         }
 
         org.testng.Assert.assertTrue(success, "Form submission failed in " + friendlyName.toLowerCase());
@@ -87,19 +83,13 @@ public class BrowserTest {
             // Execute Module 2.
             success = Module2_ContactFormFlow.execute(launcher.page, browserName);
         } catch (Exception e) {
-            e.printStackTrace(); // Print launch exceptions to console for visibility
+            // e.printStackTrace(); // Print launch exceptions to console for visibility
             success = false;
         }
 
         String friendlyName = browserName;
         if ("chromium".equalsIgnoreCase(browserName)) {
             friendlyName = "chrome";
-        }
-
-        if (success) {
-            System.out.println("contact form submitted successfully in " + friendlyName.toLowerCase());
-        } else {
-            System.out.println("contact form submission failed in " + friendlyName.toLowerCase());
         }
 
         org.testng.Assert.assertTrue(success, "Contact form submission failed in " + friendlyName.toLowerCase());
@@ -114,7 +104,7 @@ public class BrowserTest {
             // Execute Module 3.
             success = Module3_CloudServiceCompanyFormFlow.execute(launcher.page, browserName);
         } catch (Exception e) {
-            e.printStackTrace(); // Print launch exceptions to console for visibility
+            // e.printStackTrace(); // Print launch exceptions to console for visibility
             success = false;
         }
 
@@ -123,12 +113,7 @@ public class BrowserTest {
             friendlyName = "chrome";
         }
 
-        if (success) {
-            System.out.println("cloud service company form submitted successfully in " + friendlyName.toLowerCase());
-        } else {
-            System.out.println("cloud service company form submission failed in " + friendlyName.toLowerCase());
-        }
-
-        org.testng.Assert.assertTrue(success, "Cloud service company form submission failed in " + friendlyName.toLowerCase());
+        org.testng.Assert.assertTrue(success,
+                "Cloud service company form submission failed in " + friendlyName.toLowerCase());
     }
 }

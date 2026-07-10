@@ -7,10 +7,10 @@ import com.microsoft.playwright.options.WaitUntilState;
 import com.rlogical.automation.utils.AutomationHelper;
 
 public class Module3_CloudServiceCompanyFormFlow {
-    private static final String URL = "https://uat.rlogical.com/cloud-service-company/";
+    private static final String URL = AutomationHelper.BASE_URL + "cloud-service-company/";
 
     public static boolean execute(Page page, String browserType) {
-        AutomationHelper.enablePopupWatcher = true;
+        AutomationHelper.enablePopupWatcher.set(true);
         try {
             return com.rlogical.automation.utils.FailureHandler.runWithFailureHandling(page, "Module3", browserType,
                     (p) -> {
@@ -65,7 +65,7 @@ public class Module3_CloudServiceCompanyFormFlow {
                         return AutomationHelper.navigateAndSubmit(p, URL, ".hire-dedicated-form", null, browserType);
                     });
         } finally {
-            AutomationHelper.enablePopupWatcher = false;
+            AutomationHelper.enablePopupWatcher.remove();
         }
     }
 }

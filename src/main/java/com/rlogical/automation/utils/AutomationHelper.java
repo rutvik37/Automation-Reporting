@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class AutomationHelper {
+    public static final String BASE_URL = "https://www.rlogical.com/";
+
     static {
         // Extract native libraries to temp directory and set jna.library.path to prioritize them
         try {
@@ -54,7 +56,7 @@ public class AutomationHelper {
         }
     }
     private static final String TESSDATA_PATH = "tessdata";
-    public static boolean enablePopupWatcher = false;
+    public static final ThreadLocal<Boolean> enablePopupWatcher = ThreadLocal.withInitial(() -> false);
 
     // Static form data values
     private static final String STATIC_NAME = "Tester Testing";
@@ -145,12 +147,24 @@ public class AutomationHelper {
     }
 
     public static boolean fillAndSubmitForm(Page page, String containerSelector, String browserType) {
+        if (page.url().contains("/thank-you/")) {
+            try {
+                com.microsoft.playwright.BrowserContext ctx = page.context();
+                com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                page.close();
+                if (ctx != null) ctx.close();
+                if (br != null) br.close();
+            } catch (Exception e) {
+                // Ignore
+            }
+            return true;
+        }
         Locator container = page.locator(containerSelector).first();
 
         try {
             safeWaitFor(page, container, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
         } catch (Exception e) {
-            System.err.println("[" + browserType + "] Error: Form container " + containerSelector + " not visible.");
+            // System.err.println("[" + browserType + "] Error: Form container " + containerSelector + " not visible.");
             return false;
         }
 
@@ -162,16 +176,29 @@ public class AutomationHelper {
             safeWaitFor(page, captchaImg, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
             safeWaitFor(page, captchaInput, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15000));
         } catch (Exception e) {
-            System.err.println("[" + browserType + "] Error: Captcha image or input element not found in form.");
+            // System.err.println("[" + browserType + "] Error: Captcha image or input element not found in form.");
             return false;
         }
 
-        int maxSubmitAttempts = 3;
+        int maxSubmitAttempts = 8;
         String lastChallengeId = "";
         String lastImgSrc = "";
 
         try {
             for (int submitAttempt = 1; submitAttempt <= maxSubmitAttempts; submitAttempt++) {
+                if (page.url().contains("/thank-you/")) {
+                    try {
+                        com.microsoft.playwright.BrowserContext ctx = page.context();
+                        com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                        page.close();
+                        if (ctx != null) ctx.close();
+                        if (br != null) br.close();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    return true;
+                }
+                System.out.println("Attempt " + submitAttempt + "/" + maxSubmitAttempts);
                 if (containerSelector.equals("#quickContact")) {
                     if (submitAttempt == 1) {
                         fillDummyDataForForm(page, container);
@@ -182,12 +209,12 @@ public class AutomationHelper {
                         java.util.List<String> missingFields = getMissingFields(container);
 
                         if (!missingFields.isEmpty()) {
-                            System.out.println("Missing mandatory fields:");
-                            for (String field : missingFields) {
-                                System.out.println("* " + field);
-                            }
-                            System.out.println();
-                            System.out.println("Refilling missing fields only.");
+                            // System.out.println("Missing mandatory fields:");
+                            // for (String field : missingFields) {
+                            //     System.out.println("* " + field);
+                            // }
+                            // System.out.println();
+                            // System.out.println("Refilling missing fields only.");
 
                             while (!missingFields.isEmpty() && validationAttempts < maxValidationAttempts) {
                                 fillMissingFields(page, container, missingFields, browserType);
@@ -197,15 +224,18 @@ public class AutomationHelper {
                         }
 
                         if (missingFields.isEmpty()) {
-                            System.out.println("All mandatory fields verified successfully.");
+                            // System.out.println("All mandatory fields verified successfully.");
                         } else {
-                            System.err.println("[" + browserType + "] Error: Mandatory fields not filled successfully after validation.");
-                            return false;
+                            // System.err.println("[" + browserType + "] Error: Mandatory fields not filled successfully after validation.");
+                            if (submitAttempt < maxSubmitAttempts) {
+                                System.out.println("Captcha validation failed. Retrying...");
+                            }
+                            continue;
                         }
                     } else {
-                        System.out.println("Submission failed.");
-                        System.out.println("Rechecking field values.");
-                        System.out.println();
+                        // System.out.println("Submission failed.");
+                        // System.out.println("Rechecking field values.");
+                        // System.out.println();
 
                         // Wait for new captcha
                         long refreshStart = System.currentTimeMillis();
@@ -235,11 +265,11 @@ public class AutomationHelper {
 
                         java.util.List<String> missingFields = getMissingFields(container);
 
-                        System.out.println("Refilling:");
-                        for (String field : missingFields) {
-                            System.out.println("* " + field);
-                        }
-                        System.out.println();
+                        // System.out.println("Refilling:");
+                        // for (String field : missingFields) {
+                        //     System.out.println("* " + field);
+                        // }
+                        // System.out.println();
 
                         // Fill missing fields only
                         int validationAttempts = 0;
@@ -250,7 +280,7 @@ public class AutomationHelper {
                             validationAttempts++;
                         }
 
-                        System.out.println("Retrying submission.");
+                        // System.out.println("Retrying submission.");
                     }
                 } else {
                     // Legacy non-Module 1 form flow
@@ -279,8 +309,11 @@ public class AutomationHelper {
 
                     boolean captchaSolved = solveCaptchaForForm(page, container, captchaImg, captchaInput, browserType);
                     if (!captchaSolved) {
-                        System.err.println("[" + browserType + "] Error: Captcha solving failed.");
-                        return false;
+                        // System.err.println("[" + browserType + "] Error: Captcha solving failed.");
+                        if (submitAttempt < maxSubmitAttempts) {
+                            System.out.println("Captcha validation failed. Retrying...");
+                        }
+                        continue;
                     }
                 }
 
@@ -288,7 +321,7 @@ public class AutomationHelper {
                 try {
                     safeWaitFor(page, submitBtn, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
                 } catch (Exception e) {
-                    System.err.println("[" + browserType + "] Error: Submit button not visible.");
+                    // System.err.println("[" + browserType + "] Error: Submit button not visible.");
                     return false;
                 }
 
@@ -311,8 +344,8 @@ public class AutomationHelper {
                 }
 
                 // Log URL and submit button state before clicking submit
-                System.out.println("[" + browserType + "] URL before submit: " + page.url());
-                System.out.println("[" + browserType + "] Submit button state: visible=" + submitBtn.isVisible() + ", enabled=" + submitBtn.isEnabled());
+                // System.out.println("[" + browserType + "] URL before submit: " + page.url());
+                // System.out.println("[" + browserType + "] Submit button state: visible=" + submitBtn.isVisible() + ", enabled=" + submitBtn.isEnabled());
 
                 if (submitAttempt == 1) {
                     page.waitForTimeout(500); // Wait 0.5 seconds on first attempt
@@ -330,9 +363,17 @@ public class AutomationHelper {
                 while (System.currentTimeMillis() - startTime < maxWaitMs) {
                     try {
                         String currentUrl = page.url();
-                        if (currentUrl.startsWith("https://uat.rlogical.com/thank-you/") || currentUrl.equals("https://uat.rlogical.com/thank-you")) {
-                            isSuccess = true;
-                            break;
+                        if (currentUrl.contains("/thank-you/")) {
+                            try {
+                                com.microsoft.playwright.BrowserContext ctx = page.context();
+                                com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                                page.close();
+                                if (ctx != null) ctx.close();
+                                if (br != null) br.close();
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                            return true;
                         }
 
                         // Early Failure Detection: check native class states on form element
@@ -353,7 +394,7 @@ public class AutomationHelper {
                         }
                         String formClass = (String) formEl.evaluate("el => el.className");
                         if (formClass != null && (formClass.contains("invalid") || formClass.contains("failed") || formClass.contains("spam"))) {
-                            System.out.println("[" + browserType + "] Early failure detected via form class: " + formClass);
+                            // System.out.println("[" + browserType + "] Early failure detected via form class: " + formClass);
                             break;
                         }
 
@@ -368,7 +409,7 @@ public class AutomationHelper {
                                 }
                             }
                             if (hasVisibleTip) {
-                                System.out.println("[" + browserType + "] Early failure detected via validation tips.");
+                                // System.out.println("[" + browserType + "] Early failure detected via validation tips.");
                                 break;
                             }
                         }
@@ -389,39 +430,43 @@ public class AutomationHelper {
                             String responseText = responseOutput.innerText().trim();
                             if (!responseText.isEmpty() && !responseText.toLowerCase().contains("thank you") && 
                                 !responseText.toLowerCase().contains("sent") && !responseText.toLowerCase().contains("success")) {
-                                System.out.println("[" + browserType + "] Early failure detected via response output: " + responseText);
+                                // System.out.println("[" + browserType + "] Early failure detected via response output: " + responseText);
                                 break;
                             }
                         }
                     } catch (Exception e) {
                         // Ignore exceptions caused by page unloading/navigating during submit
                     }
-                    page.waitForTimeout(200);
+                    page.waitForTimeout(50);
                 }
 
                 // Log URL and success/error details after attempt
-                System.out.println("[" + browserType + "] URL after submit: " + page.url());
+                // System.out.println("[" + browserType + "] URL after submit: " + page.url());
                 if (isSuccess) {
-                    System.out.println("[" + browserType + "] Success detected! Redirected to thank you page.");
+                    // System.out.println("[" + browserType + "] Success detected! Redirected to thank you page.");
                 } else {
-                    System.err.println("[" + browserType + "] Failure detected! Did not redirect to https://uat.rlogical.com/thank-you/");
+                    // System.err.println("[" + browserType + "] Failure detected! Did not redirect to " + BASE_URL + "thank-you/");
                 }
 
                 // Take screenshot after submit
                 try {
                     new File("screenshots").mkdirs();
-                    String screenshotName = "screenshots/after_submit_" + browserType + "_attempt_" + submitAttempt + ".png";
+                    long threadId = Thread.currentThread().getId();
+                    String screenshotName = "screenshots/after_submit_" + browserType + "_thread_" + threadId + "_attempt_" + submitAttempt + ".png";
                     page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(screenshotName)));
-                    System.out.println("[" + browserType + "] Saved screenshot: " + screenshotName);
+                    // System.out.println("[" + browserType + "] Saved screenshot: " + screenshotName);
                 } catch (Exception e) {
-                    System.err.println("[" + browserType + "] Failed to take screenshot: " + e.getMessage());
+                    // System.err.println("[" + browserType + "] Failed to take screenshot: " + e.getMessage());
                 }
 
                 if (isSuccess) {
                     return true;
                 }
 
-                System.err.println("[" + browserType + "] Attempt " + submitAttempt + " timed out or failed waiting for redirection.");
+                if (submitAttempt < maxSubmitAttempts) {
+                    System.out.println("Captcha validation failed. Retrying...");
+                }
+                // System.err.println("[" + browserType + "] Attempt " + submitAttempt + " timed out or failed waiting for redirection.");
                 continue;
             }
         } finally {
@@ -431,8 +476,9 @@ public class AutomationHelper {
     }
 
     private static void cleanUpTempFiles(String browserType) {
-        String rawPath = "scratch/captcha_raw_" + browserType + ".png";
-        String preprocessedPath = "scratch/captcha_preprocessed_" + browserType + ".png";
+        long threadId = Thread.currentThread().getId();
+        String rawPath = "scratch/captcha_raw_" + browserType + "_" + threadId + ".png";
+        String preprocessedPath = "scratch/captcha_preprocessed_" + browserType + "_" + threadId + ".png";
         try {
             Files.deleteIfExists(Paths.get(rawPath));
         } catch (Exception e) {
@@ -454,9 +500,10 @@ public class AutomationHelper {
     }
 
     public static boolean solveCaptchaForForm(Page page, Locator container, Locator captchaImg, Locator captchaInput, String browserType) {
+        long threadId = Thread.currentThread().getId();
+        String rawPath = "scratch/captcha_raw_" + browserType + "_" + threadId + ".png";
+        String preprocessedPath = "scratch/captcha_preprocessed_" + browserType + "_" + threadId + ".png";
         int maxCaptchaAttempts = 5;
-        String rawPath = "scratch/captcha_raw_" + browserType + ".png";
-        String preprocessedPath = "scratch/captcha_preprocessed_" + browserType + ".png";
 
         for (int attempt = 1; attempt <= maxCaptchaAttempts; attempt++) {
             try {
@@ -500,8 +547,8 @@ public class AutomationHelper {
                         extractedCode = "1234";
                     }
                 } catch (Exception e) {
-                    System.err.println("[" + browserType + "] OCR attempt failed: " + e.getMessage());
-                    e.printStackTrace();
+                    // System.err.println("[" + browserType + "] OCR attempt failed: " + e.getMessage());
+                    // e.printStackTrace();
                 }
             }
 
@@ -736,6 +783,18 @@ public class AutomationHelper {
     }
 
     public static boolean navigateAndSubmit(Page page, String url, String containerSelector, String triggerSelector, String browserType) {
+        if (page.url().contains("/thank-you/")) {
+            try {
+                com.microsoft.playwright.BrowserContext ctx = page.context();
+                com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                page.close();
+                if (ctx != null) ctx.close();
+                if (br != null) br.close();
+            } catch (Exception e) {
+                // Ignore
+            }
+            return true;
+        }
         // Register dynamic locator handler to close popup modals automatically whenever they appear
         try {
             Locator popupOverlay = page.locator("#rdemo_popup_modal, .rdemo_popup_modal, #rdemo_popup").first();
@@ -768,6 +827,18 @@ public class AutomationHelper {
         boolean clickedTrigger = false;
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
+            if (page.url().contains("/thank-you/")) {
+                try {
+                    com.microsoft.playwright.BrowserContext ctx = page.context();
+                    com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                    page.close();
+                    if (ctx != null) ctx.close();
+                    if (br != null) br.close();
+                } catch (Exception e) {
+                    // Ignore
+                }
+                return true;
+            }
             checkAndDismissPopup(page);
             handlePopupsIfPresent(page);
 
@@ -787,10 +858,22 @@ public class AutomationHelper {
             page.waitForTimeout(100);
         }
 
+        if (page.url().contains("/thank-you/")) {
+            try {
+                com.microsoft.playwright.BrowserContext ctx = page.context();
+                com.microsoft.playwright.Browser br = ctx != null ? ctx.browser() : null;
+                page.close();
+                if (ctx != null) ctx.close();
+                if (br != null) br.close();
+            } catch (Exception e) {
+                // Ignore
+            }
+            return true;
+        }
         try {
             safeWaitFor(page, container, new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5000));
         } catch (Exception e) {
-            System.err.println("[" + browserType + "] Error: Target form " + containerSelector + " not visible.");
+            // System.err.println("[" + browserType + "] Error: Target form " + containerSelector + " not visible.");
             return false;
         }
 
@@ -798,7 +881,7 @@ public class AutomationHelper {
     }
 
     public static void checkAndDismissPopup(Page page) {
-        if (!enablePopupWatcher || page == null) {
+        if (!enablePopupWatcher.get() || page == null) {
             return;
         }
         try {

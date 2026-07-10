@@ -102,6 +102,7 @@
                             <value>com.rlogical.automation.reporting.ExtentReportListener</value>
                         </property>
                     </properties>
+                    <printSummary>false</printSummary>
                 </configuration>
             </plugin>
         </plugins>

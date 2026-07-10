@@ -7,7 +7,7 @@ import com.microsoft.playwright.options.WaitUntilState;
 import com.rlogical.automation.utils.AutomationHelper;
 
 public class Module2_ContactFormFlow {
-    private static final String URL = "https://uat.rlogical.com/";
+    private static final String URL = AutomationHelper.BASE_URL;
 
     public static boolean execute(Page page, String browserType) {
         return com.rlogical.automation.utils.FailureHandler.runWithFailureHandling(page, "Module2", browserType,
